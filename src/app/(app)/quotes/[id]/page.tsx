@@ -4,8 +4,15 @@ import { getCurrentUser } from "@/lib/current-user";
 import { serializeQuote } from "@/lib/quote-presenter";
 import QuoteWorkspace from "@/components/quotes/QuoteWorkspace";
 
-export default async function QuotePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function QuotePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ new?: string }>;
+}) {
   const { id } = await params;
+  const { new: isNewParam } = await searchParams;
   const user = await getCurrentUser();
 
   const quote = await prisma.quote.findUnique({
@@ -31,7 +38,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
       quoteId={quote.id}
       initialMessages={initialMessages}
       initialQuote={serializeQuote(quote)}
-      isNew={initialMessages.length === 0}
+      isNew={isNewParam === "1"}
     />
   );
 }

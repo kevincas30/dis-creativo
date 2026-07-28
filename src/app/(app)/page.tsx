@@ -2,15 +2,11 @@ import { Plus, BarChart3 } from "lucide-react";
 import { createDraftQuote } from "./quotes/actions";
 import { getCurrentUser } from "@/lib/current-user";
 import { prisma } from "@/lib/prisma";
+import { firstNameOf } from "@/lib/names";
 import QuickActionCard from "@/components/home/QuickActionCard";
 import AuroraBackground from "@/components/home/AuroraBackground";
 import SummaryCard from "@/components/home/SummaryCard";
 import type { QuoteStatus } from "@/generated/prisma/enums";
-
-function firstNameOf(displayName: string) {
-  const first = displayName.trim().split(/\s+/)[0] ?? displayName;
-  return first.charAt(0).toUpperCase() + first.slice(1);
-}
 
 function greetingFor(hour: number) {
   if (hour >= 5 && hour < 12) return { text: "Buenos días", emoji: "☀️" };

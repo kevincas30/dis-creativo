@@ -13,7 +13,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 
   const sidebarQuotes = quotes.map((quote) => ({
     id: quote.id,
-    title: quote.client?.name ? `Presupuesto ${quote.client.name}` : "Nuevo presupuesto",
+    title: quote.client?.name ?? "Nuevo presupuesto",
     status: quote.status,
   }));
 

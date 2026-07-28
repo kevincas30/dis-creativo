@@ -4,32 +4,51 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/current-user";
+import { firstNameOf } from "@/lib/names";
 import type { Prisma } from "@/generated/prisma/client";
 import type { QuoteStatus } from "@/generated/prisma/enums";
 
-// Mensaje fijo de intake — se siembra directo en la base de datos (sin llamar
-// a Gemini) para no gastar cuota solo en generar un saludo genérico.
-const INTAKE_MESSAGE = `Perfecto, vamos a crear un presupuesto. Envíame la siguiente información en un solo mensaje:
+// Saludo y mensaje de intake fijos — se siembran directo en la base de datos
+// (sin llamar a Gemini) para no gastar cuota solo en arrancar la conversación.
+const GREETING_MESSAGE = "Hola, quiero hacer un presupuesto";
 
-• Cliente
-• País
-• Empresa (opcional)
-• Servicio o tipo de proyecto
-• Cantidad o alcance
-• Moneda (EUR o MXN)
-• Fecha límite (opcional)
-• Notas adicionales (opcional)`;
+function buildIntakeMessage(name: string) {
+  return `# Vamos a crear tu presupuesto
+
+Muy bien ${name}, envíame la siguiente información para preparar la propuesta más rápido:
+
+- 👤 Cliente
+- 🌍 País
+- 🏢 Empresa (opcional)
+- 💼 Servicio o proyecto
+- 📦 Cantidad o alcance
+- 💶 Moneda (EUR o MXN)
+- 📅 Fecha límite (opcional)
+- 📝 Notas adicionales (opcional)
+
+---
+
+Con esa información podré preparar el presupuesto rápidamente. 🚀`;
+}
 
 export async function createDraftQuote() {
   const user = await getCurrentUser();
+  const greetingAt = new Date();
+  const intakeAt = new Date(greetingAt.getTime() + 1);
+
   const quote = await prisma.quote.create({
     data: {
       userId: user.id,
-      messages: { create: { role: "assistant", content: INTAKE_MESSAGE } },
+      messages: {
+        create: [
+          { role: "user", content: GREETING_MESSAGE, createdAt: greetingAt },
+          { role: "assistant", content: buildIntakeMessage(firstNameOf(user.displayName)), createdAt: intakeAt },
+        ],
+      },
     },
   });
   revalidatePath("/", "layout");
-  redirect(`/quotes/${quote.id}`);
+  redirect(`/quotes/${quote.id}?new=1`);
 }
 
 export async function duplicateQuote(quoteId: string) {

@@ -20,10 +20,10 @@ export default function QuoteWorkspace({
 
   return (
     <div className="flex h-full">
-      <div className="border-surface-border flex w-1/2 flex-col border-r">
+      <div className="border-surface-border flex w-[56%] flex-col border-r">
         <ChatPanel quoteId={quoteId} initialMessages={initialMessages} isNew={isNew} onQuoteUpdate={setQuote} />
       </div>
-      <div className="w-1/2">
+      <div className="w-[44%]">
         <QuotePreview
           quote={quote}
           onStatusChange={(status) => setQuote((prev) => (prev ? { ...prev, status } : prev))}

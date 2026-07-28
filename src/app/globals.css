@@ -17,8 +17,6 @@
   --brand-pink: #db2c95;
   --brand-pink-glow: #ffa6e4;
   --gradient-glow: rgba(219, 44, 149, 0.08);
-  --assistant-bubble: #424242;
-  --assistant-bubble-foreground: #ffffff;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -39,8 +37,6 @@
     --brand-pink: #db2c95;
     --brand-pink-glow: #ffa6e4;
     --gradient-glow: rgba(219, 44, 149, 0.14);
-    --assistant-bubble: #424242;
-    --assistant-bubble-foreground: #ffffff;
   }
 }
 
@@ -60,8 +56,6 @@
   --color-brand-teal-light: var(--brand-teal-light);
   --color-brand-pink: var(--brand-pink);
   --color-brand-pink-glow: var(--brand-pink-glow);
-  --color-assistant-bubble: var(--assistant-bubble);
-  --color-assistant-bubble-foreground: var(--assistant-bubble-foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px -8px rgb(0 0 0 / 0.12);

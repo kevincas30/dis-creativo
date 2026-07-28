@@ -109,9 +109,9 @@ export default function Sidebar({ quotes, user }: { quotes: SidebarQuote[]; user
                   >
                     <Link
                       href={href}
-                      className={`focus-visible:ring-accent/40 flex items-center gap-2 truncate rounded-xl border-l-2 py-2 pr-8 pl-3 text-sm transition-all duration-200 ease-out focus-visible:ring-2 focus-visible:outline-none ${
+                      className={`focus-visible:ring-accent/40 flex items-center gap-2 truncate rounded-xl border py-2 pr-8 pl-3 text-sm transition-all duration-200 ease-out focus-visible:ring-2 focus-visible:outline-none ${
                         isActive
-                          ? "border-white bg-white/10 text-foreground font-medium"
+                          ? "border-surface-border bg-white/10 text-foreground font-medium"
                           : "border-transparent text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
                       }`}
                     >
