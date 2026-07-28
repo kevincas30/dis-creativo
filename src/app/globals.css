@@ -1,0 +1,219 @@
+@import "tailwindcss";
+
+:root {
+  --background: #fafaf9;
+  --foreground: #18181b;
+  --muted-foreground: rgba(24, 24, 27, 0.6);
+  --surface: rgba(255, 255, 255, 0.72);
+  --surface-solid: #ffffff;
+  --surface-border: rgba(24, 24, 27, 0.08);
+  --accent: #317689;
+  --accent-hover: #3d8fa6;
+  --accent-active: #285f70;
+  --accent-soft: rgba(49, 118, 137, 0.12);
+  --accent-foreground: #ffffff;
+  --brand-teal: #317689;
+  --brand-teal-light: #a6d9e2;
+  --brand-pink: #db2c95;
+  --brand-pink-glow: #ffa6e4;
+  --gradient-glow: rgba(219, 44, 149, 0.08);
+  --assistant-bubble: #424242;
+  --assistant-bubble-foreground: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0b0b0e;
+    --foreground: #ffffff;
+    --muted-foreground: rgba(255, 255, 255, 0.6);
+    --surface: rgba(24, 24, 27, 0.6);
+    --surface-solid: #17171b;
+    --surface-border: rgba(244, 244, 245, 0.08);
+    --accent: #317689;
+    --accent-hover: #3d8fa6;
+    --accent-active: #285f70;
+    --accent-soft: rgba(49, 118, 137, 0.16);
+    --accent-foreground: #ffffff;
+    --brand-teal: #317689;
+    --brand-teal-light: #a6d9e2;
+    --brand-pink: #db2c95;
+    --brand-pink-glow: #ffa6e4;
+    --gradient-glow: rgba(219, 44, 149, 0.14);
+    --assistant-bubble: #424242;
+    --assistant-bubble-foreground: #ffffff;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-surface: var(--surface);
+  --color-surface-solid: var(--surface-solid);
+  --color-surface-border: var(--surface-border);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-active: var(--accent-active);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-brand-teal: var(--brand-teal);
+  --color-brand-teal-light: var(--brand-teal-light);
+  --color-brand-pink: var(--brand-pink);
+  --color-brand-pink-glow: var(--brand-pink-glow);
+  --color-assistant-bubble: var(--assistant-bubble);
+  --color-assistant-bubble-foreground: var(--assistant-bubble-foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px -8px rgb(0 0 0 / 0.12);
+  --shadow-elevated: 0 4px 12px rgb(0 0 0 / 0.06), 0 24px 48px -12px rgb(0 0 0 / 0.24);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--background);
+  background-image: radial-gradient(ellipse 60% 40% at 50% -10%, var(--gradient-glow), transparent);
+  background-repeat: no-repeat;
+  color: var(--foreground);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Scrollbar fino y semitransparente, estilo overlay de macOS. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--surface-border) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: var(--muted-foreground);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--foreground);
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@utility animate-fade-in-up {
+  animation: fade-in-up 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@utility animate-scale-in {
+  animation: scale-in 0.12s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes typing-dot {
+  0%,
+  60%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+
+@utility animate-typing-dot {
+  animation: typing-dot 1.1s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-typing-dot {
+    animation: none;
+    opacity: 0.6;
+  }
+}
+
+@utility glass {
+  background-color: var(--color-surface);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--color-surface-border);
+}
+
+@keyframes aurora-drift-1 {
+  0%,
+  100% {
+    transform: translate(-8%, -6%) scale(1);
+  }
+  50% {
+    transform: translate(6%, 8%) scale(1.15);
+  }
+}
+
+@keyframes aurora-drift-2 {
+  0%,
+  100% {
+    transform: translate(8%, 4%) scale(1.1);
+  }
+  50% {
+    transform: translate(-6%, -8%) scale(1);
+  }
+}
+
+@keyframes aurora-drift-3 {
+  0%,
+  100% {
+    transform: translate(-4%, 8%) scale(1);
+  }
+  50% {
+    transform: translate(8%, -6%) scale(1.12);
+  }
+}
+
+@utility animate-aurora-1 {
+  animation: aurora-drift-1 70s ease-in-out infinite;
+}
+
+@utility animate-aurora-2 {
+  animation: aurora-drift-2 85s ease-in-out infinite;
+}
+
+@utility animate-aurora-3 {
+  animation: aurora-drift-3 95s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-aurora-1,
+  .animate-aurora-2,
+  .animate-aurora-3 {
+    animation: none;
+  }
+}

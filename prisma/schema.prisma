@@ -1,0 +1,195 @@
+// Prisma schema — Presupuestador Inteligente KEVS
+// Modelo de datos basado en PRD.md secciones 3-12.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Currency {
+  MXN
+  EUR
+}
+
+enum QuoteStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+  ARCHIVED
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED
+}
+
+enum UserRole {
+  ADMIN
+  MEMBER
+}
+
+/// Cuenta de usuario del estudio. id coincide con el id de Supabase Auth (auth.users.id).
+/// MVP: un solo usuario (Kevs, ADMIN). El campo role existe desde ya para soportar
+/// los 2 usuarios adicionales previstos sin necesitar una migración futura.
+model User {
+  id          String   @id @default(uuid())
+  email       String   @unique
+  displayName String
+  avatarUrl   String?  @db.Text
+  role        UserRole @default(ADMIN)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  quotes Quote[]
+
+  @@map("users")
+}
+
+/// Cliente del estudio, guardado como registro persistente ("ticket")
+/// para detectar recurrencia y ver su historial de presupuestos.
+model Client {
+  id              String    @id @default(uuid())
+  name            String
+  company         String?
+  email           String?
+  phone           String?
+  defaultCurrency Currency?
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  quotes Quote[]
+
+  @@map("clients")
+}
+
+/// Servicio del catálogo (webs, diseño de redes, fotografía, etc.).
+/// Editable por el usuario desde la app, sin intervención de desarrollo.
+model Service {
+  id          String   @id @default(uuid())
+  name        String
+  category    String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  pricingRules   PricingRule[]
+  quoteLineItems QuoteLineItem[]
+
+  @@map("services")
+}
+
+/// Precio de referencia de un servicio para un mercado/moneda específico.
+/// No es una conversión de divisa: cada moneda tiene su propio precio base,
+/// que la IA puede sugerir/actualizar investigando el mercado actual (PRD 5 y 10).
+model PricingRule {
+  id        String   @id @default(uuid())
+  serviceId String
+  service   Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  currency  Currency
+  basePrice Decimal  @db.Decimal(10, 2)
+  unitLabel String?
+  notes     String?
+  updatedAt DateTime @updatedAt
+
+  @@unique([serviceId, currency])
+  @@map("pricing_rules")
+}
+
+/// Presupuesto. Se crea como borrador vacío al iniciar la conversación y se va
+/// completando incrementalmente; guarda el resultado final, la explicación del
+/// cálculo y el copy de venta que se incluyen en el PDF (PRD 4, 8 y 10).
+model Quote {
+  id       String  @id @default(uuid())
+  userId   String
+  user     User    @relation(fields: [userId], references: [id])
+  clientId String?
+  client   Client? @relation(fields: [clientId], references: [id])
+
+  /// Nulos hasta que la IA los determina vía set_client (a partir del país).
+  currency       Currency?
+  taxRatePercent Decimal?    @db.Decimal(5, 2)
+  status         QuoteStatus @default(DRAFT)
+
+  /// Respuestas del cuestionario guiado por servicio (estructura dinámica).
+  questionnaireAnswers Json?
+
+  subtotal      Decimal       @default(0) @db.Decimal(10, 2)
+  discountType  DiscountType?
+  discountValue Decimal?      @db.Decimal(10, 2)
+  discountReason String?
+  taxAmount      Decimal      @default(0) @db.Decimal(10, 2)
+  total          Decimal      @default(0) @db.Decimal(10, 2)
+
+  /// Explicación en lenguaje claro de cómo se calculó el precio (uso interno / opcional en PDF).
+  calculationExplanation String? @db.Text
+  /// Descripción persuasiva del servicio para el PDF ("vender", no solo listar precio).
+  salesDescription       String? @db.Text
+  termsAndConditions     String? @db.Text
+  deliveryTimeline       String?
+
+  issuedAt   DateTime  @default(now())
+  validUntil DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lineItems     QuoteLineItem[]
+  statusHistory QuoteStatusHistory[]
+  messages      ConversationMessage[]
+
+  @@map("quotes")
+}
+
+/// Turno de texto legible de la conversación guiada de un presupuesto.
+/// No guarda las llamadas a herramientas de Gemini (functionCall/functionResponse):
+/// el estado real vive en Quote/Client/QuoteLineItem, así que al reabrir un
+/// presupuesto basta con este historial de texto para dar contexto a la IA.
+model ConversationMessage {
+  id      String @id @default(uuid())
+  quoteId String
+  quote   Quote  @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  /// "user" | "model" (mismos valores de rol que usa la API de Gemini).
+  role    String
+  content String @db.Text
+
+  createdAt DateTime @default(now())
+
+  @@map("conversation_messages")
+}
+
+/// Línea individual del desglose del presupuesto.
+model QuoteLineItem {
+  id        String   @id @default(uuid())
+  quoteId   String
+  quote     Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  serviceId String?
+  service   Service? @relation(fields: [serviceId], references: [id])
+
+  description String
+  quantity    Decimal @default(1) @db.Decimal(10, 2)
+  unitPrice   Decimal @db.Decimal(10, 2)
+  lineTotal   Decimal @db.Decimal(10, 2)
+  sortOrder   Int     @default(0)
+
+  @@map("quote_line_items")
+}
+
+/// Auditoría de cambios de estado de un presupuesto (Borrador -> Enviado -> Aceptado/Rechazado).
+model QuoteStatusHistory {
+  id        String      @id @default(uuid())
+  quoteId   String
+  quote     Quote       @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  status    QuoteStatus
+  note      String?
+  changedAt DateTime    @default(now())
+
+  @@map("quote_status_history")
+}
