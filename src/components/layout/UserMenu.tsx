@@ -12,7 +12,7 @@ import { useMounted } from "@/components/ui/Modal";
 import Avatar from "@/components/ui/Avatar";
 import RenameUserModal from "@/components/layout/RenameUserModal";
 
-type MenuPosition = { top: number; right: number };
+type MenuPosition = { bottom: number; left: number };
 
 export default function UserMenu({
   initialUser,
@@ -62,7 +62,7 @@ export default function UserMenu({
       const next = !prev;
       if (next && triggerRef.current) {
         const rect = triggerRef.current.getBoundingClientRect();
-        setMenuPos({ top: rect.bottom + 8, right: window.innerWidth - rect.right });
+        setMenuPos({ bottom: window.innerHeight - rect.top + 8, left: rect.left });
       }
       return next;
     });
@@ -103,7 +103,7 @@ export default function UserMenu({
         onClick={handleToggle}
         aria-haspopup="menu"
         aria-expanded={isOpen}
-        className={`flex items-center gap-2 rounded-xl px-2 py-1.5 text-sm transition-colors duration-150 ${
+        className={`flex w-full items-center gap-2 rounded-xl px-2 py-1.5 text-sm transition-colors duration-150 ${
           isOpen ? "bg-foreground/10" : "hover:bg-foreground/5"
         }`}
       >
@@ -125,8 +125,8 @@ export default function UserMenu({
             <div
               ref={menuRef}
               role="menu"
-              style={{ top: menuPos.top, right: menuPos.right }}
-              className="bg-surface-solid/95 border-surface-border shadow-elevated animate-scale-in fixed z-20 w-60 origin-top-right overflow-hidden rounded-xl border py-1 backdrop-blur-sm"
+              style={{ bottom: menuPos.bottom, left: menuPos.left }}
+              className="bg-surface-solid/95 border-surface-border shadow-elevated animate-scale-in fixed z-20 w-60 origin-bottom-left overflow-hidden rounded-xl border py-1 backdrop-blur-sm"
             >
               <div className="flex items-center gap-3 px-3 py-3">
                 <Avatar name={user.displayName} avatarUrl={user.avatarUrl} className="h-10 w-10 text-sm" />
