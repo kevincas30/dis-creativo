@@ -122,6 +122,21 @@ body {
   animation: fade-in-up 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Fundido puro, sin desplazamiento — para el contenido del sidebar al
+   contraer/expandir, donde un slide se percibe como un "salto". */
+@utility animate-fade-in {
+  animation: fade-in 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 @keyframes scale-in {
   from {
     opacity: 0;
@@ -175,7 +190,7 @@ body {
   background-color: var(--liquid-glass-bg, var(--color-surface));
   background-image:
     linear-gradient(to bottom, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0) 40%),
-    radial-gradient(120% 80% at 15% -10%, rgba(255, 166, 228, 0.05), transparent 55%);
+    radial-gradient(120% 80% at 15% -10%, var(--liquid-glass-glow, rgba(255, 166, 228, 0.05)), transparent 55%);
   backdrop-filter: blur(32px) saturate(160%);
   -webkit-backdrop-filter: blur(32px) saturate(160%);
   border-width: 1px;
@@ -185,8 +200,8 @@ body {
     inset 0 1px 0 rgba(255, 255, 255, 0.14),
     inset 0 0 0 1px rgba(255, 255, 255, 0.03),
     0 24px 60px -24px rgba(0, 0, 0, 0.5);
-  transition-property: border-color, box-shadow, transform;
-  transition-duration: 0.2s;
+  transition-property: border-color, box-shadow, transform, width;
+  transition-duration: 0.2s, 0.2s, 0.2s, 0.32s;
   transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
 
   &:hover {
