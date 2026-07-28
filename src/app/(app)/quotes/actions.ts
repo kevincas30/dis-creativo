@@ -7,9 +7,27 @@ import { getCurrentUser } from "@/lib/current-user";
 import type { Prisma } from "@/generated/prisma/client";
 import type { QuoteStatus } from "@/generated/prisma/enums";
 
+// Mensaje fijo de intake — se siembra directo en la base de datos (sin llamar
+// a Gemini) para no gastar cuota solo en generar un saludo genérico.
+const INTAKE_MESSAGE = `Perfecto, vamos a crear un presupuesto. Envíame la siguiente información en un solo mensaje:
+
+• Cliente
+• País
+• Empresa (opcional)
+• Servicio o tipo de proyecto
+• Cantidad o alcance
+• Moneda (EUR o MXN)
+• Fecha límite (opcional)
+• Notas adicionales (opcional)`;
+
 export async function createDraftQuote() {
   const user = await getCurrentUser();
-  const quote = await prisma.quote.create({ data: { userId: user.id } });
+  const quote = await prisma.quote.create({
+    data: {
+      userId: user.id,
+      messages: { create: { role: "assistant", content: INTAKE_MESSAGE } },
+    },
+  });
   revalidatePath("/", "layout");
   redirect(`/quotes/${quote.id}`);
 }
