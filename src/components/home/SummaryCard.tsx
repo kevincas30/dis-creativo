@@ -23,7 +23,7 @@ export default function SummaryCard({ stats }: { stats: QuoteSummaryStats }) {
 
   return (
     <div
-      className="glass animate-fade-in-up w-full max-w-xl rounded-2xl p-4 shadow-soft"
+      className="liquid-glass animate-fade-in-up w-full max-w-xl rounded-2xl p-4"
       style={{ animationDelay: "220ms" }}
     >
       <div className="flex items-center justify-between">
@@ -38,7 +38,7 @@ export default function SummaryCard({ stats }: { stats: QuoteSummaryStats }) {
           <div key={item.status} className="flex items-center gap-1.5 text-sm">
             <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${QUOTE_STATUS_CONFIG[item.status].dotClassName}`} />
             <span className="text-muted-foreground truncate">{QUOTE_STATUS_CONFIG[item.status].label}s</span>
-            <span className="ml-auto font-medium">{item.value}</span>
+            <span className="font-medium">{item.value}</span>
           </div>
         ))}
       </div>
