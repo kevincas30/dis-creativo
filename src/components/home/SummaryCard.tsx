@@ -23,7 +23,7 @@ export default function SummaryCard({ stats }: { stats: QuoteSummaryStats }) {
 
   return (
     <div
-      className="liquid-glass animate-fade-in-up w-full max-w-xl rounded-2xl p-4"
+      className="liquid-glass animate-fade-in-up w-full rounded-2xl p-4"
       style={{ animationDelay: "220ms" }}
     >
       <div className="flex items-center justify-between">
