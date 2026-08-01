@@ -3,10 +3,10 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { MoreHorizontal, Pencil, Copy, FileDown, Trash2, Loader2, Clock } from "lucide-react";
+import { MoreHorizontal, Pencil, Copy, FileDown, Trash2, Loader2 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { duplicateQuote, deleteQuote } from "@/app/(app)/quotes/actions";
-import Modal, { useMounted } from "@/components/ui/Modal";
+import { useMounted } from "@/components/ui/Modal";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 
 type Action = "duplicate" | "delete" | null;
@@ -28,7 +28,7 @@ export default function QuoteActionsMenu({
   const [pendingAction, setPendingAction] = useState<Action>(null);
   const [isPending, startTransition] = useTransition();
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [pdfModalOpen, setPdfModalOpen] = useState(false);
+  const [pdfConfirmOpen, setPdfConfirmOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -79,6 +79,13 @@ export default function QuoteActionsMenu({
     startTransition(async () => {
       await duplicateQuote(quoteId);
     });
+  }
+
+  function handleExportPdf() {
+    // Descarga directa: el Content-Disposition del route handler ya fuerza
+    // el diálogo nativo de descarga, sin necesidad de Blob/fetch en cliente.
+    window.location.href = `/api/quotes/${quoteId}/pdf`;
+    setPdfConfirmOpen(false);
   }
 
   function handleDeleteConfirmed() {
@@ -139,7 +146,7 @@ export default function QuoteActionsMenu({
                 label="Exportar PDF"
                 onSelect={() => {
                   setIsOpen(false);
-                  setPdfModalOpen(true);
+                  setPdfConfirmOpen(true);
                 }}
               />
               <div className="border-surface-border my-1 border-t" />
@@ -167,20 +174,16 @@ export default function QuoteActionsMenu({
         onClose={() => setConfirmOpen(false)}
       />
 
-      <Modal isOpen={pdfModalOpen} onClose={() => setPdfModalOpen(false)}>
-        <div className="flex items-start gap-3">
-          <div className="bg-accent-soft flex h-10 w-10 shrink-0 items-center justify-center rounded-xl">
-            <Clock className="text-foreground h-5 w-5" strokeWidth={1.75} />
-          </div>
-          <div className="space-y-1 pt-1">
-            <h2 className="text-base font-semibold tracking-tight">Exportar a PDF</h2>
-            <p className="text-muted-foreground text-sm">
-              Esta función todavía no está disponible — estamos trabajando en la plantilla de PDF con la marca de
-              Diseño Creativo. Muy pronto vas a poder generar el documento final desde aquí.
-            </p>
-          </div>
-        </div>
-      </Modal>
+      <ConfirmDialog
+        isOpen={pdfConfirmOpen}
+        tone="default"
+        icon={FileDown}
+        title="Exportar a PDF"
+        description="¿Deseas generar el PDF de este presupuesto? Se descargará al instante con el diseño de Diseño Creativo."
+        confirmLabel="Sí, generar"
+        onConfirm={handleExportPdf}
+        onClose={() => setPdfConfirmOpen(false)}
+      />
     </>
   );
 }

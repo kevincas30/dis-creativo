@@ -15,6 +15,8 @@ export type QuoteSnapshotInput = {
   id: string;
   status: QuoteStatus;
   currency: string | null;
+  createdAt: Date;
+  updatedAt: Date;
   taxRatePercent: Decimalish;
   subtotal: Decimalish;
   discountType: string | null;
@@ -38,6 +40,7 @@ export type QuoteSnapshotInput = {
     quantity: Decimalish;
     unitPrice: Decimalish;
     lineTotal: Decimalish;
+    discountPercent: Decimalish;
     serviceId: string | null;
     sortOrder: number;
   }>;
@@ -50,6 +53,8 @@ export function serializeQuote(quote: QuoteSnapshotInput) {
     id: quote.id,
     status: quote.status,
     currency: quote.currency,
+    createdAt: quote.createdAt.toISOString(),
+    updatedAt: quote.updatedAt.toISOString(),
     taxRatePercent: toNumberOrNull(quote.taxRatePercent),
     subtotal: toNumberOrNull(quote.subtotal) ?? 0,
     discountType: quote.discountType,
@@ -69,6 +74,7 @@ export function serializeQuote(quote: QuoteSnapshotInput) {
         quantity: toNumberOrNull(item.quantity) ?? 0,
         unitPrice: toNumberOrNull(item.unitPrice) ?? 0,
         lineTotal: toNumberOrNull(item.lineTotal) ?? 0,
+        discountPercent: toNumberOrNull(item.discountPercent),
         serviceId: item.serviceId,
       })),
   };

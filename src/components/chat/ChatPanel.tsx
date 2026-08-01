@@ -7,6 +7,14 @@ import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { QuoteSnapshot } from "@/lib/quote-presenter";
 import IconButton from "@/components/ui/IconButton";
+import QuoteDocumentCard from "@/components/chat/QuoteDocumentCard";
+import IntakeFormCard from "@/components/chat/IntakeFormCard";
+
+// Marca el mensaje fijo de intake sembrado por createDraftQuote() (ver
+// src/app/(app)/quotes/actions.ts) — su texto no cambia, solo se reemplaza
+// su renderizado por IntakeFormCard. El contenido en BD/contexto de Gemini
+// sigue siendo el mismo texto Markdown, no se toca.
+const INTAKE_MESSAGE_MARKER = "# Vamos a crear tu presupuesto";
 
 export type ChatMessage = {
   role: "user" | "assistant";
@@ -80,15 +88,20 @@ export default function ChatPanel({
   quoteId,
   initialMessages,
   isNew,
+  quote,
   onQuoteUpdate,
+  initialCanExportPdf,
 }: {
   quoteId: string;
   initialMessages: ChatMessage[];
   isNew: boolean;
+  quote: QuoteSnapshot | null;
   onQuoteUpdate: (quote: QuoteSnapshot) => void;
+  initialCanExportPdf: boolean;
 }) {
   const router = useRouter();
   const pathname = usePathname();
+  const [canExportPdf, setCanExportPdf] = useState(initialCanExportPdf);
   // Si es un presupuesto recién creado, arrancamos mostrando solo el saludo
   // del usuario — el mensaje del asistente se revela tras el indicador de
   // escritura simulado, para que se sienta como una respuesta real y no como
@@ -187,6 +200,7 @@ export default function ChatPanel({
             });
           } else if (event.type === "quote_updated") {
             onQuoteUpdate(event.quote);
+            setCanExportPdf(event.quote.lineItems.length > 0 && Boolean(event.quote.client));
             // El sidebar (título del presupuesto) vive en el layout, un Server
             // Component aparte — refresh lo sincroniza sin perder el estado del chat.
             router.refresh();
@@ -238,6 +252,21 @@ export default function ChatPanel({
                 {message.content}
               </div>
             );
+          }
+
+          const isLastMessage = index === messages.length - 1;
+
+          // El último turno, cuando el presupuesto ya está completo, deja de
+          // verse como un mensaje de chat y se muestra como el documento
+          // estructurado (ver QuoteDocumentCard) — el resto de la
+          // conversación (preguntas de aclaración, turnos previos) sigue
+          // renderizándose como texto Markdown normal.
+          if (isLastMessage && !isSending && canExportPdf && quote) {
+            return <QuoteDocumentCard key={index} quote={quote} quoteId={quoteId} onQuoteUpdate={onQuoteUpdate} />;
+          }
+
+          if (message.content.startsWith(INTAKE_MESSAGE_MARKER)) {
+            return <IntakeFormCard key={index} />;
           }
 
           return (

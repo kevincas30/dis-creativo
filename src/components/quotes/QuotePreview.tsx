@@ -63,11 +63,21 @@ export default function QuotePreview({
         ) : (
           <div className="mt-2 space-y-1.5">
             {quote.lineItems.map((item) => (
-              <div key={item.id} className="flex justify-between text-sm">
-                <span>
-                  {item.description} × {item.quantity}
-                </span>
-                <span className="text-muted-foreground">{formatMoney(item.lineTotal, currency)}</span>
+              <div key={item.id} className="text-sm">
+                <div className="flex justify-between">
+                  <span>
+                    {item.description} × {item.quantity}
+                  </span>
+                  <span className="text-muted-foreground">{formatMoney(item.lineTotal, currency)}</span>
+                </div>
+                {item.discountPercent ? (
+                  <div className="text-muted-foreground flex justify-between text-xs">
+                    <span>Descuento por volumen</span>
+                    <span>
+                      -{item.discountPercent}% (-{formatMoney(item.quantity * item.unitPrice - item.lineTotal, currency)})
+                    </span>
+                  </div>
+                ) : null}
               </div>
             ))}
           </div>

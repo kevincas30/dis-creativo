@@ -21,7 +21,14 @@ export default function QuoteWorkspace({
   return (
     <div className="flex h-full">
       <div className="border-surface-border flex w-[56%] flex-col border-r">
-        <ChatPanel quoteId={quoteId} initialMessages={initialMessages} isNew={isNew} onQuoteUpdate={setQuote} />
+        <ChatPanel
+          quoteId={quoteId}
+          initialMessages={initialMessages}
+          isNew={isNew}
+          quote={quote}
+          onQuoteUpdate={setQuote}
+          initialCanExportPdf={initialQuote.lineItems.length > 0 && Boolean(initialQuote.client)}
+        />
       </div>
       <div className="w-[44%]">
         <QuotePreview

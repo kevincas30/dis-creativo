@@ -72,6 +72,9 @@ model Client {
 /// Editable por el usuario desde la app, sin intervención de desarrollo.
 model Service {
   id          String   @id @default(uuid())
+  /// Identificador estable para servicios del catálogo oficial (p. ej. "SOCIAL_POST"),
+  /// usado por el motor de precios para no depender de coincidencias de texto.
+  code        String?  @unique
   name        String
   category    String
   description String?
@@ -80,9 +83,24 @@ model Service {
   updatedAt   DateTime @updatedAt
 
   pricingRules   PricingRule[]
+  discountRules  DiscountRule[]
   quoteLineItems QuoteLineItem[]
 
   @@map("services")
+}
+
+/// Tramo de descuento por volumen para un servicio (mismos tramos en todas las monedas).
+model DiscountRule {
+  id        String  @id @default(uuid())
+  serviceId String
+  service   Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  minQty    Int
+  /// Nulo = "o más" (sin límite superior del tramo).
+  maxQty    Int?
+  percent   Decimal @db.Decimal(5, 2)
+
+  @@unique([serviceId, minQty])
+  @@map("discount_rules")
 }
 
 /// Precio de referencia de un servicio para un mercado/moneda específico.
@@ -177,6 +195,8 @@ model QuoteLineItem {
   quantity    Decimal @default(1) @db.Decimal(10, 2)
   unitPrice   Decimal @db.Decimal(10, 2)
   lineTotal   Decimal @db.Decimal(10, 2)
+  /// % de descuento por volumen aplicado a esta línea (catálogo oficial). Nulo si no aplica.
+  discountPercent Decimal? @db.Decimal(5, 2)
   sortOrder   Int     @default(0)
 
   @@map("quote_line_items")
