@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { MoreHorizontal, Pencil, Copy, FileDown, Trash2, Loader2 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { duplicateQuote, deleteQuote } from "@/app/(app)/quotes/actions";
+import { duplicateQuote, deleteQuote } from "@/app/presupuestos/quotes/actions";
 import { useMounted } from "@/components/ui/Modal";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 
@@ -71,7 +71,7 @@ export default function QuoteActionsMenu({
 
   function handleEdit() {
     setIsOpen(false);
-    router.push(`/quotes/${quoteId}`);
+    router.push(`/presupuestos/quotes/${quoteId}`);
   }
 
   function handleDuplicate() {

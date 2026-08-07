@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { ChevronDown, Check } from "lucide-react";
 import type { QuoteStatus } from "@/generated/prisma/enums";
 import { QUOTE_STATUS_ORDER, QUOTE_STATUS_CONFIG } from "@/lib/quote-status";
-import { updateQuoteStatus } from "@/app/(app)/quotes/actions";
+import { updateQuoteStatus } from "@/app/presupuestos/quotes/actions";
 import { useMounted } from "@/components/ui/Modal";
 
 type MenuPosition = { top: number; left: number };

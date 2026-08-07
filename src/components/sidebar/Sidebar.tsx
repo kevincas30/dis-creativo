@@ -4,8 +4,8 @@ import { useState, type MouseEvent } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Plus, FileText, PanelLeftClose, Calendar } from "lucide-react";
-import { createDraftQuote } from "@/app/(app)/quotes/actions";
+import { Plus, FileText, PanelLeftClose, Calendar, ArrowLeft } from "lucide-react";
+import { createDraftQuote } from "@/app/presupuestos/quotes/actions";
 import Button from "@/components/ui/Button";
 import IconButton from "@/components/ui/IconButton";
 import Avatar from "@/components/ui/Avatar";
@@ -75,6 +75,17 @@ export default function Sidebar({ quotes, user }: { quotes: SidebarQuote[]; user
         <div className="animate-fade-in flex w-16 flex-1 flex-col items-center gap-3 overflow-hidden py-4">
           <Image src="/logo.svg" alt="Diseño Creativo" width={36} height={36} className="rounded-full" />
 
+          <Link
+            href="/"
+            onClick={stopPropagation}
+            aria-label="Volver al panel principal"
+            title="Volver al panel principal"
+            className="liquid-glass focus-visible:ring-accent/40 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-foreground transition-all duration-200 ease-out hover:-translate-y-px active:translate-y-0 active:scale-[0.9] focus-visible:ring-2 focus-visible:outline-none"
+            style={AGENDA_GLASS_VARS}
+          >
+            <ArrowLeft className="h-4 w-4" strokeWidth={2} />
+          </Link>
+
           <form action={createDraftQuote} onClick={stopPropagation}>
             <IconButton type="submit" variant="glass" aria-label="Nuevo presupuesto" style={NEW_QUOTE_GLASS_VARS}>
               <Plus className="h-4 w-4" strokeWidth={2} />
@@ -82,7 +93,7 @@ export default function Sidebar({ quotes, user }: { quotes: SidebarQuote[]; user
           </form>
 
           <Link
-            href="/agenda"
+            href="/presupuestos/agenda"
             onClick={stopPropagation}
             aria-label="Agenda"
             className="liquid-glass focus-visible:ring-accent/40 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-foreground transition-all duration-200 ease-out hover:-translate-y-px active:translate-y-0 active:scale-[0.9] focus-visible:ring-2 focus-visible:outline-none"
@@ -99,12 +110,21 @@ export default function Sidebar({ quotes, user }: { quotes: SidebarQuote[]; user
         <div className="animate-fade-in flex w-64 flex-1 flex-col overflow-hidden">
           <div className="flex items-center gap-3 px-4 py-4">
             <Link
-              href="/"
+              href="/presupuestos"
               className="focus-visible:ring-accent/40 shadow-soft inline-block rounded-xl transition-transform duration-200 ease-out hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:outline-none"
             >
               <Image src="/logo.svg" alt="Diseño Creativo" width={36} height={36} className="rounded-full" />
             </Link>
             <h1 className="min-w-0 flex-1 truncate text-sm font-semibold tracking-tight">Diseño Creativo</h1>
+            <Link
+              href="/"
+              aria-label="Volver al panel principal"
+              title="Volver al panel principal"
+              className="liquid-glass focus-visible:ring-accent/40 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-foreground transition-all duration-200 ease-out hover:-translate-y-px active:translate-y-0 active:scale-[0.9] focus-visible:ring-2 focus-visible:outline-none"
+              style={AGENDA_GLASS_VARS}
+            >
+              <ArrowLeft className="h-4 w-4" strokeWidth={2} />
+            </Link>
             <button
               type="button"
               onClick={() => setIsCollapsed(true)}
@@ -123,7 +143,7 @@ export default function Sidebar({ quotes, user }: { quotes: SidebarQuote[]; user
               </Button>
             </form>
             <Link
-              href="/agenda"
+              href="/presupuestos/agenda"
               className="liquid-glass focus-visible:ring-accent/40 flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium text-foreground transition-all duration-200 ease-out hover:-translate-y-px active:translate-y-0 active:scale-[0.97] focus-visible:ring-2 focus-visible:outline-none"
               style={AGENDA_GLASS_VARS}
             >
@@ -141,7 +161,7 @@ export default function Sidebar({ quotes, user }: { quotes: SidebarQuote[]; user
               <p className="text-muted-foreground px-3 py-4 text-xs">Todavía no hay presupuestos.</p>
             ) : (
               quotes.map((quote, index) => {
-                const href = `/quotes/${quote.id}`;
+                const href = `/presupuestos/quotes/${quote.id}`;
                 const isActive = pathname === href;
                 return (
                   <div

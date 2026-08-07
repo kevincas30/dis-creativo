@@ -37,7 +37,7 @@ export default function ActivityTimeline({ events }: { events: ActivityEventData
         return (
           <Link
             key={event.id}
-            href={`/quotes/${event.quoteId}`}
+            href={`/presupuestos/quotes/${event.quoteId}`}
             className="hover:bg-foreground/5 flex items-center gap-3 rounded-xl px-2 py-1.5 text-sm transition-colors"
           >
             <span className="bg-accent-soft flex h-7 w-7 shrink-0 items-center justify-center rounded-full">

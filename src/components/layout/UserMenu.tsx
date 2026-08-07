@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { Camera, Pencil, LogOut, Loader2 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { signOut } from "@/app/login/actions";
-import { updateAvatar, updateDisplayName } from "@/app/(app)/profile/actions";
+import { updateAvatar, updateDisplayName } from "@/app/profile/actions";
 import { resizeImageToDataUrl } from "@/lib/resize-image";
 import { useMounted } from "@/components/ui/Modal";
 import Avatar from "@/components/ui/Avatar";

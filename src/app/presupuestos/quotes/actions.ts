@@ -48,7 +48,7 @@ export async function createDraftQuote() {
     },
   });
   revalidatePath("/", "layout");
-  redirect(`/quotes/${quote.id}?new=1`);
+  redirect(`/presupuestos/quotes/${quote.id}?new=1`);
 }
 
 export async function duplicateQuote(quoteId: string) {
@@ -99,7 +99,7 @@ export async function duplicateQuote(quoteId: string) {
   });
 
   revalidatePath("/", "layout");
-  redirect(`/quotes/${duplicate.id}`);
+  redirect(`/presupuestos/quotes/${duplicate.id}`);
 }
 
 export async function deleteQuote(quoteId: string) {

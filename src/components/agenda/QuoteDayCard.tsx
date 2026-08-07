@@ -19,7 +19,7 @@ export default function QuoteDayCard({ quote }: { quote: AgendaQuote }) {
   const colors = AGENDA_STATUS_COLORS[quote.status];
   return (
     <Link
-      href={`/quotes/${quote.id}`}
+      href={`/presupuestos/quotes/${quote.id}`}
       className={`block truncate rounded-lg border px-1.5 py-1 text-[11px] leading-tight transition-colors duration-150 hover:border-white/30 ${colors.bg} ${colors.border}`}
     >
       <span className="flex items-center gap-1">

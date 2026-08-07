@@ -57,7 +57,7 @@ export default function RecentActivityCard({ events }: { events: ActivityEventDa
       </div>
 
       <div className="mt-2 flex justify-end">
-        <Link href="/agenda" className="text-accent hover:opacity-80 text-xs font-medium transition-opacity">
+        <Link href="/presupuestos/agenda" className="text-accent hover:opacity-80 text-xs font-medium transition-opacity">
           Ver toda la actividad
         </Link>
       </div>

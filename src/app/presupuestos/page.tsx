@@ -146,7 +146,7 @@ export default async function Home() {
               />
             </form>
             <Link
-              href="/agenda"
+              href="/presupuestos/agenda"
               className="liquid-glass group focus-visible:ring-accent/40 animate-fade-in-up flex items-center gap-3 rounded-2xl p-4 text-left transition-transform duration-200 ease-out hover:-translate-y-px active:translate-y-0 active:scale-[0.98] focus-visible:ring-2 focus-visible:outline-none"
               style={{ "--liquid-glass-border": "rgba(166, 217, 226, 0.18)", animationDelay: "140ms" } as React.CSSProperties}
             >

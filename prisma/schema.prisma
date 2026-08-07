@@ -34,6 +34,26 @@ enum UserRole {
   MEMBER
 }
 
+enum ProjectStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  REVIEW
+  DONE
+}
+
+enum EventType {
+  MEETING
+  DELIVERY
+  REVIEW
+  PAYMENT
+  REMINDER
+}
+
+enum ClientStatus {
+  ACTIVE
+  INACTIVE
+}
+
 /// Cuenta de usuario del estudio. id coincide con el id de Supabase Auth (auth.users.id).
 /// MVP: un solo usuario (Kevs, ADMIN). El campo role existe desde ya para soportar
 /// los 2 usuarios adicionales previstos sin necesitar una migración futura.
@@ -46,26 +66,41 @@ model User {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  quotes Quote[]
+  quotes   Quote[]
+  projects Project[]
+  events   Event[]
 
   @@map("users")
 }
 
-/// Cliente del estudio, guardado como registro persistente ("ticket")
-/// para detectar recurrencia y ver su historial de presupuestos.
+/// Cliente del estudio — compartido por Presupuestos IA (que solo lee/escribe
+/// name/company/defaultCurrency, vía process-budget-request.ts) y por el
+/// módulo Clientes (CRM del dashboard principal), que además usa
+/// firstName/lastName/country/address/website/status. "name" se mantiene
+/// como nombre completo sincronizado (nunca se quita ni se renombra) para no
+/// romper Presupuestos IA, que depende de él en PDFs, chat y actividad.
 model Client {
-  id              String    @id @default(uuid())
+  id              String       @id @default(uuid())
   name            String
+  firstName       String?
+  lastName        String?
   company         String?
   email           String?
   phone           String?
+  country         String?
+  address         String?
+  website         String?
   defaultCurrency Currency?
+  status          ClientStatus @default(ACTIVE)
   notes           String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
 
   quotes Quote[]
+  events Event[]
 
+  @@index([name])
+  @@index([company])
   @@map("clients")
 }
 
@@ -239,4 +274,52 @@ model QuoteStatusHistory {
   changedAt DateTime    @default(now())
 
   @@map("quote_status_history")
+}
+
+/// Proyecto del módulo Proyectos (dashboard principal) — independiente del
+/// módulo Presupuestos IA, sin relación con Quote/Client. "client" y "owner"
+/// son texto libre porque todavía no existen los módulos reales de Clientes
+/// ni Equipo (ambos siguen siendo placeholders "Próximamente").
+model Project {
+  id          String        @id @default(uuid())
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  client      String
+  type        String?
+  description String?       @db.Text
+  owner       String?
+  dueDate     DateTime?
+  progress    Int           @default(0)
+  status      ProjectStatus @default(NOT_STARTED)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  events Event[]
+
+  @@map("projects")
+}
+
+/// Evento de la Agenda comercial (dashboard principal) — independiente de la
+/// agenda interna de Presupuestos IA (que se deriva de Quote.followUpDate).
+/// Reutiliza Client y Project por id (ambos opcionales) en vez de duplicar
+/// esos datos.
+model Event {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  type      EventType @default(MEETING)
+  startAt   DateTime
+  endAt     DateTime
+  location  String?
+  notes     String?   @db.Text
+  clientId  String?
+  client    Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  projectId String?
+  project   Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@map("events")
 }

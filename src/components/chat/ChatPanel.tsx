@@ -12,7 +12,7 @@ import QuoteDocumentCard from "@/components/chat/QuoteDocumentCard";
 import IntakeFormCard from "@/components/chat/IntakeFormCard";
 
 // Marca el mensaje fijo de intake sembrado por createDraftQuote() (ver
-// src/app/(app)/quotes/actions.ts) — su texto no cambia, solo se reemplaza
+// src/app/presupuestos/quotes/actions.ts) — su texto no cambia, solo se reemplaza
 // su renderizado por IntakeFormCard. El contenido en BD/contexto de Gemini
 // sigue siendo el mismo texto Markdown, no se toca.
 const INTAKE_MESSAGE_MARKER = "# Vamos a crear tu presupuesto";
@@ -268,7 +268,7 @@ export default function ChatPanel({
   return (
     <div className="relative flex h-full flex-col">
       <Link
-        href="/"
+        href="/presupuestos"
         aria-label="Volver al inicio"
         title="Volver al inicio"
         className="liquid-glass focus-visible:ring-accent/40 absolute top-4 left-4 z-10 inline-flex h-9 w-9 items-center justify-center rounded-full text-foreground transition-all duration-200 ease-out hover:-translate-y-px active:translate-y-0 active:scale-[0.9] focus-visible:ring-2 focus-visible:outline-none"

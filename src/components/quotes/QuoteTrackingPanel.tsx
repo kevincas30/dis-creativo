@@ -4,7 +4,7 @@ import { useState, type KeyboardEvent, type ReactNode } from "react";
 import { Lock, Pencil, Trash2, Plus, Check, X } from "lucide-react";
 import type { QuoteSnapshot } from "@/lib/quote-presenter";
 import { QUOTE_STATUS_CONFIG } from "@/lib/quote-status";
-import { createQuoteNote, updateQuoteNote, deleteQuoteNote } from "@/app/(app)/quotes/actions";
+import { createQuoteNote, updateQuoteNote, deleteQuoteNote } from "@/app/presupuestos/quotes/actions";
 
 function formatHumanDate(value: string | null): string {
   if (!value) return "—";

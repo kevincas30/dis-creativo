@@ -22,10 +22,12 @@ export default function Modal({
   isOpen,
   onClose,
   children,
+  className = "max-w-sm",
 }: {
   isOpen: boolean;
   onClose: () => void;
   children: ReactNode;
+  className?: string;
 }) {
   const mounted = useMounted();
 
@@ -45,7 +47,7 @@ export default function Modal({
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="animate-fade-in-up absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="animate-scale-in bg-surface-solid/95 border-surface-border shadow-elevated relative w-full max-w-sm rounded-2xl border p-6 backdrop-blur-sm">
+      <div className={`animate-scale-in bg-surface-solid/95 border-surface-border shadow-elevated relative w-full rounded-2xl border p-6 backdrop-blur-sm ${className}`}>
         {children}
       </div>
     </div>,

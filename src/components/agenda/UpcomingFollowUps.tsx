@@ -28,7 +28,7 @@ export default function UpcomingFollowUps({ items }: { items: UpcomingFollowUp[]
         return (
           <Link
             key={item.id}
-            href={`/quotes/${item.id}`}
+            href={`/presupuestos/quotes/${item.id}`}
             className="hover:bg-foreground/5 flex items-center justify-between gap-2 rounded-xl px-2 py-1.5 text-sm transition-colors"
           >
             <span className="flex min-w-0 items-center gap-2">

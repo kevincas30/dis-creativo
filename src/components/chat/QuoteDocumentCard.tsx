@@ -17,7 +17,7 @@ import {
   Check,
 } from "lucide-react";
 import type { QuoteSnapshot } from "@/lib/quote-presenter";
-import { updateQuoteStatus, duplicateQuote } from "@/app/(app)/quotes/actions";
+import { updateQuoteStatus, duplicateQuote } from "@/app/presupuestos/quotes/actions";
 import StatusBadge from "@/components/quotes/StatusBadge";
 import Button from "@/components/ui/Button";
 
