@@ -91,6 +91,22 @@ export function formatTime(date: Date): string {
   return new Intl.DateTimeFormat("es-MX", { hour: "numeric", minute: "2-digit" }).format(date);
 }
 
+/** Solo el nombre del día ("Viernes") — para el encabezado grande de la vista Día móvil. */
+export function formatWeekdayLabel(date: Date): string {
+  const label = new Intl.DateTimeFormat("es-ES", { weekday: "long" }).format(date);
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+/** "agosto" — para el encabezado grande de la vista Día móvil. */
+export function formatMonthNameLabel(date: Date): string {
+  return MONTH_LABELS[date.getMonth()];
+}
+
+/** "0:00", "1:00"... — etiquetas de la regla horaria del timeline. */
+export function formatHourLabel(hour: number): string {
+  return new Intl.DateTimeFormat("es-MX", { hour: "numeric" }).format(new Date(2000, 0, 1, hour));
+}
+
 /** Formato "YYYY-MM-DD" en hora local, listo para un <input type="date">. */
 export function toDateInputValue(date: Date): string {
   const year = date.getFullYear();

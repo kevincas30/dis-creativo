@@ -9,6 +9,7 @@ import AgendaListView, { type AgendaListDay } from "@/components/dashboard/agend
 import DayEventsPanel from "@/components/dashboard/agenda/DayEventsPanel";
 import AgendaEmptyState from "@/components/dashboard/agenda/AgendaEmptyState";
 import CreateEventModal from "@/components/dashboard/agenda/CreateEventModal";
+import MobileAgendaView from "@/components/dashboard/agenda/mobile/MobileAgendaView";
 import {
   addDays,
   addMonths,
@@ -137,36 +138,44 @@ export default function AgendaPageClient({
   }
 
   return (
-    <div className="space-y-6">
-      <AgendaHeader
-        view={view}
-        onViewChange={handleViewChange}
-        referenceLabel={referenceLabel}
-        onPrev={handlePrev}
-        onNext={handleNext}
-        onToday={handleToday}
-        onCreateClick={() => setIsCreateOpen(true)}
-      />
+    <div>
+      {/* Desktop/tablet: Mes/Semana/Día/Lista + panel lateral, sin cambios. */}
+      <div className="hidden space-y-6 lg:block">
+        <AgendaHeader
+          view={view}
+          onViewChange={handleViewChange}
+          referenceLabel={referenceLabel}
+          onPrev={handlePrev}
+          onNext={handleNext}
+          onToday={handleToday}
+          onCreateClick={() => setIsCreateOpen(true)}
+        />
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px] lg:items-start">
-        <div>
-          {view === "month" ? (
-            <MonthCalendarGrid
-              days={getMonthGridDays(referenceDate)}
-              referenceDate={referenceDate}
-              eventsByDay={eventsByDay}
-              selectedDay={selectedDay}
-              onSelectDay={handleSelectDay}
-            />
-          ) : null}
-          {view === "week" ? (
-            <WeekCalendarGrid days={getWeekDays(referenceDate)} eventsByDay={eventsByDay} selectedDay={selectedDay} onSelectDay={handleSelectDay} />
-          ) : null}
-          {view === "day" ? <DayView events={referenceDayEvents} /> : null}
-          {view === "list" ? <AgendaListView days={listViewDays} onSelectDay={handleSelectDay} /> : null}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px] lg:items-start">
+          <div>
+            {view === "month" ? (
+              <MonthCalendarGrid
+                days={getMonthGridDays(referenceDate)}
+                referenceDate={referenceDate}
+                eventsByDay={eventsByDay}
+                selectedDay={selectedDay}
+                onSelectDay={handleSelectDay}
+              />
+            ) : null}
+            {view === "week" ? (
+              <WeekCalendarGrid days={getWeekDays(referenceDate)} eventsByDay={eventsByDay} selectedDay={selectedDay} onSelectDay={handleSelectDay} />
+            ) : null}
+            {view === "day" ? <DayView events={referenceDayEvents} /> : null}
+            {view === "list" ? <AgendaListView days={listViewDays} onSelectDay={handleSelectDay} /> : null}
+          </div>
+
+          <DayEventsPanel date={panelDate} events={panelDayEvents} />
         </div>
+      </div>
 
-        <DayEventsPanel date={panelDate} events={panelDayEvents} />
+      {/* Móvil: experiencia tipo Calendario de iPhone (mes con puntos + vista Día a pantalla completa). */}
+      <div className="lg:hidden">
+        <MobileAgendaView eventsByDay={eventsByDay} onCreateClick={() => setIsCreateOpen(true)} />
       </div>
 
       <CreateEventModal

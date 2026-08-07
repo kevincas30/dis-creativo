@@ -146,6 +146,38 @@ body {
   animation: scale-in 0.12s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+@keyframes agenda-slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes agenda-slide-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Transición del contenido de la vista Día móvil al cambiar de día (swipe o
+   botones) — dirección según hacia dónde se navega. */
+@utility animate-agenda-slide-right {
+  animation: agenda-slide-in-right 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@utility animate-agenda-slide-left {
+  animation: agenda-slide-in-left 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 @keyframes typing-dot {
   0%,
   60%,
