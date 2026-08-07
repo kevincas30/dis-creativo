@@ -122,10 +122,62 @@ export async function updateQuoteStatus(quoteId: string, status: QuoteStatus) {
     throw new Error("No autorizado.");
   }
 
+  // Sella la fecha de seguimiento la primera vez que se alcanza ese estado
+  // (nunca se sobrescribe en cambios posteriores). Alimenta la tarjeta
+  // "Seguimiento" del panel derecho sin importar desde qué UI se cambió el estado.
+  const timestamps = {
+    ...(status === "SENT" && !quote.sentAt ? { sentAt: new Date() } : {}),
+    ...(status === "ACCEPTED" && !quote.approvedAt ? { approvedAt: new Date() } : {}),
+    ...(status === "PAID" && !quote.paidAt ? { paidAt: new Date() } : {}),
+  };
+
   await prisma.quote.update({
     where: { id: quoteId },
-    data: { status, statusHistory: { create: { status } } },
+    data: { status, ...timestamps, statusHistory: { create: { status } } },
   });
 
+  revalidatePath("/", "layout");
+}
+
+export async function createQuoteNote(quoteId: string, content: string) {
+  const user = await getCurrentUser();
+  const quote = await prisma.quote.findUniqueOrThrow({ where: { id: quoteId } });
+
+  if (quote.userId !== user.id) {
+    throw new Error("No autorizado.");
+  }
+
+  const note = await prisma.quoteNote.create({ data: { quoteId, content } });
+  revalidatePath("/", "layout");
+
+  return {
+    id: note.id,
+    content: note.content,
+    createdAt: note.createdAt.toISOString(),
+    updatedAt: note.updatedAt.toISOString(),
+  };
+}
+
+export async function updateQuoteNote(noteId: string, content: string) {
+  const user = await getCurrentUser();
+  const note = await prisma.quoteNote.findUniqueOrThrow({ where: { id: noteId }, include: { quote: true } });
+
+  if (note.quote.userId !== user.id) {
+    throw new Error("No autorizado.");
+  }
+
+  await prisma.quoteNote.update({ where: { id: noteId }, data: { content } });
+  revalidatePath("/", "layout");
+}
+
+export async function deleteQuoteNote(noteId: string) {
+  const user = await getCurrentUser();
+  const note = await prisma.quoteNote.findUniqueOrThrow({ where: { id: noteId }, include: { quote: true } });
+
+  if (note.quote.userId !== user.id) {
+    throw new Error("No autorizado.");
+  }
+
+  await prisma.quoteNote.delete({ where: { id: noteId } });
   revalidatePath("/", "layout");
 }

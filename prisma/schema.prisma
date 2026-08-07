@@ -21,6 +21,7 @@ enum QuoteStatus {
   ACCEPTED
   REJECTED
   ARCHIVED
+  PAID
 }
 
 enum DiscountType {
@@ -155,14 +156,40 @@ model Quote {
   issuedAt   DateTime  @default(now())
   validUntil DateTime?
 
+  /// Sellados por updateQuoteStatus() la primera vez que el estado llega a
+  /// ese punto (no se sobrescriben en cambios posteriores). Alimentan la
+  /// tarjeta "Seguimiento" del panel derecho.
+  sentAt     DateTime?
+  approvedAt DateTime?
+  paidAt     DateTime?
+
+  /// Fecha principal para ubicar el presupuesto en la Agenda. Si es nula, la
+  /// Agenda usa createdAt como respaldo. No hay editor todavía — se lee tal
+  /// cual quede sembrado (manualmente por ahora).
+  followUpDate DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   lineItems     QuoteLineItem[]
   statusHistory QuoteStatusHistory[]
   messages      ConversationMessage[]
+  notes         QuoteNote[]
 
   @@map("quotes")
+}
+
+/// Nota interna del estudio (bitácora, no un solo campo de texto) — nunca se
+/// incluye en el PDF del cliente.
+model QuoteNote {
+  id        String   @id @default(uuid())
+  quoteId   String
+  quote     Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("quote_notes")
 }
 
 /// Turno de texto legible de la conversación guiada de un presupuesto.

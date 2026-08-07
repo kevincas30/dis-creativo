@@ -1,13 +1,14 @@
 import { forwardRef } from "react";
 import type { ButtonHTMLAttributes } from "react";
 
-type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
+type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "glass";
 
 const VARIANT_CLASSES: Record<ButtonVariant, string> = {
   primary: "bg-white text-zinc-900 shadow-soft hover:bg-zinc-100 active:bg-zinc-200",
   secondary: "glass text-foreground hover:border-accent/30",
   ghost: "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
   danger: "bg-red-500 text-white shadow-soft hover:bg-red-600 active:bg-red-700",
+  glass: "liquid-glass text-foreground",
 };
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: ButtonVariant };

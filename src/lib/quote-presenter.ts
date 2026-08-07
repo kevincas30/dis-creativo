@@ -11,12 +11,20 @@ function toNumberOrNull(value: Decimalish): number | null {
   return Number(value);
 }
 
+function toISOOrNull(value: Date | null): string | null {
+  return value ? value.toISOString() : null;
+}
+
 export type QuoteSnapshotInput = {
   id: string;
   status: QuoteStatus;
   currency: string | null;
   createdAt: Date;
   updatedAt: Date;
+  sentAt: Date | null;
+  approvedAt: Date | null;
+  paidAt: Date | null;
+  notes: Array<{ id: string; content: string; createdAt: Date; updatedAt: Date }>;
   taxRatePercent: Decimalish;
   subtotal: Decimalish;
   discountType: string | null;
@@ -55,6 +63,18 @@ export function serializeQuote(quote: QuoteSnapshotInput) {
     currency: quote.currency,
     createdAt: quote.createdAt.toISOString(),
     updatedAt: quote.updatedAt.toISOString(),
+    sentAt: toISOOrNull(quote.sentAt),
+    approvedAt: toISOOrNull(quote.approvedAt),
+    paidAt: toISOOrNull(quote.paidAt),
+    notes: quote.notes
+      .slice()
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .map((note) => ({
+        id: note.id,
+        content: note.content,
+        createdAt: note.createdAt.toISOString(),
+        updatedAt: note.updatedAt.toISOString(),
+      })),
     taxRatePercent: toNumberOrNull(quote.taxRatePercent),
     subtotal: toNumberOrNull(quote.subtotal) ?? 0,
     discountType: quote.discountType,

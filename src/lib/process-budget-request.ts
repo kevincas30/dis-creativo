@@ -436,7 +436,7 @@ export async function processBudgetRequest(message: string, quoteId: string): Pr
     await prisma.conversationMessage.create({ data: { quoteId, role: "assistant", content: summary } });
     const quote = await prisma.quote.findUniqueOrThrow({
       where: { id: quoteId },
-      include: { client: true, lineItems: { orderBy: { sortOrder: "asc" } } },
+      include: { client: true, lineItems: { orderBy: { sortOrder: "asc" } }, notes: true },
     });
     return { summary, quote: serializeQuote(quote), canExportPdf: quote.lineItems.length > 0 && !!quote.client };
   }
@@ -587,7 +587,7 @@ export async function processBudgetRequest(message: string, quoteId: string): Pr
 
     const finalQuote = await tx.quote.findUniqueOrThrow({
       where: { id: quoteId },
-      include: { client: true, lineItems: { orderBy: { sortOrder: "asc" } } },
+      include: { client: true, lineItems: { orderBy: { sortOrder: "asc" } }, notes: true },
     });
 
     return { quote: finalQuote, catalogResults, allSurcharges };

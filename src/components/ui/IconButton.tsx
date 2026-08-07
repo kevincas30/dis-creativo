@@ -1,11 +1,12 @@
 import { forwardRef } from "react";
 import type { ButtonHTMLAttributes } from "react";
 
-type IconButtonVariant = "default" | "accent";
+type IconButtonVariant = "default" | "accent" | "glass";
 
 const VARIANT_CLASSES: Record<IconButtonVariant, string> = {
   default: "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
   accent: "bg-white text-zinc-900 shadow-soft hover:bg-zinc-100 active:bg-zinc-200",
+  glass: "liquid-glass text-foreground",
 };
 
 type IconButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: IconButtonVariant };

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useRef, useEffect, type KeyboardEvent } from "react";
+import { useState, useRef, useEffect, Fragment, type KeyboardEvent } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { ArrowUp } from "lucide-react";
+import Link from "next/link";
+import { ArrowUp, ArrowLeft } from "lucide-react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { QuoteSnapshot } from "@/lib/quote-presenter";
@@ -19,6 +20,7 @@ const INTAKE_MESSAGE_MARKER = "# Vamos a crear tu presupuesto";
 export type ChatMessage = {
   role: "user" | "assistant";
   content: string;
+  createdAt: string;
 };
 
 type StreamEvent =
@@ -84,6 +86,32 @@ function TypingIndicator() {
   );
 }
 
+function isSameDay(a: Date, b: Date) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+function formatDateSeparator(date: Date) {
+  const now = new Date();
+  const datePart = new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "short", year: "numeric" }).format(date);
+  const timePart = new Intl.DateTimeFormat("es-ES", { hour: "2-digit", minute: "2-digit", hour12: false }).format(date);
+  return `${isSameDay(date, now) ? "Hoy, " : ""}${datePart} · ${timePart}`;
+}
+
+// Separador de fecha estilo WhatsApp: uno antes del primer mensaje (fecha y
+// hora de creación del chat) y uno nuevo cada vez que la conversación cruza
+// a otro día calendario.
+function DateSeparator({ date }: { date: Date }) {
+  return (
+    <div className="flex items-center gap-3">
+      <span className="border-surface-border h-px flex-1 border-t" />
+      <span className="text-muted-foreground bg-foreground/5 shrink-0 rounded-full px-3 py-1 text-xs">
+        {formatDateSeparator(date)}
+      </span>
+      <span className="border-surface-border h-px flex-1 border-t" />
+    </div>
+  );
+}
+
 export default function ChatPanel({
   quoteId,
   initialMessages,
@@ -146,13 +174,13 @@ export default function ChatPanel({
 
   async function runStream(body: { quoteId: string; message?: string; kickoff?: boolean }) {
     setIsSending(true);
-    setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+    setMessages((prev) => [...prev, { role: "assistant", content: "", createdAt: new Date().toISOString() }]);
 
     const showError = (text: string) => {
       setMessages((prev) => {
         const updated = [...prev];
         updated[updated.length - 1] = {
-          role: "assistant",
+          ...updated[updated.length - 1],
           content: updated[updated.length - 1].content + `\n\n⚠️ ${text}`,
         };
         return updated;
@@ -193,7 +221,7 @@ export default function ChatPanel({
             setMessages((prev) => {
               const updated = [...prev];
               updated[updated.length - 1] = {
-                role: "assistant",
+                ...updated[updated.length - 1],
                 content: updated[updated.length - 1].content + event.text,
               };
               return updated;
@@ -220,7 +248,7 @@ export default function ChatPanel({
     const text = input.trim();
     if (!text || isSending) return;
 
-    setMessages((prev) => [...prev, { role: "user", content: text }]);
+    setMessages((prev) => [...prev, { role: "user", content: text, createdAt: new Date().toISOString() }]);
     setInput("");
     requestAnimationFrame(resizeTextarea);
     await runStream({ quoteId, message: text });
@@ -238,47 +266,65 @@ export default function ChatPanel({
   }
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex-1 space-y-6 overflow-y-auto px-6 pt-10 pb-6">
+    <div className="relative flex h-full flex-col">
+      <Link
+        href="/"
+        aria-label="Volver al inicio"
+        title="Volver al inicio"
+        className="liquid-glass focus-visible:ring-accent/40 absolute top-4 left-4 z-10 inline-flex h-9 w-9 items-center justify-center rounded-full text-foreground transition-all duration-200 ease-out hover:-translate-y-px active:translate-y-0 active:scale-[0.9] focus-visible:ring-2 focus-visible:outline-none"
+      >
+        <ArrowLeft className="h-4 w-4" strokeWidth={1.75} />
+      </Link>
+
+      <div className="flex-1 space-y-6 overflow-y-auto px-6 pt-16 pb-6">
         {messages.map((message, index) => {
           const isLastPending = isSending && index === messages.length - 1;
+          const messageDate = new Date(message.createdAt);
+          // Separador de fecha: siempre antes del primer mensaje, y de nuevo
+          // cada vez que la conversación cruza a otro día calendario.
+          const previousDate = index > 0 ? new Date(messages[index - 1].createdAt) : null;
+          const showDateSeparator = index === 0 || !previousDate || !isSameDay(messageDate, previousDate);
+
+          let body: React.ReactNode;
 
           if (message.role === "user") {
-            return (
-              <div
-                key={index}
-                className="animate-fade-in-up ml-auto max-w-[72%] rounded-3xl border border-white/[0.06] bg-[#2a2a2f] px-4 py-2.5 text-sm whitespace-pre-wrap text-white shadow-soft transition-colors duration-150 hover:bg-[#323238]"
-              >
+            body = (
+              <div className="animate-fade-in-up ml-auto max-w-[72%] rounded-3xl border border-white/[0.06] bg-[#2a2a2f] px-4 py-2.5 text-sm whitespace-pre-wrap text-white shadow-soft transition-colors duration-150 hover:bg-[#323238]">
                 {message.content}
               </div>
             );
-          }
+          } else {
+            const isLastMessage = index === messages.length - 1;
 
-          const isLastMessage = index === messages.length - 1;
-
-          // El último turno, cuando el presupuesto ya está completo, deja de
-          // verse como un mensaje de chat y se muestra como el documento
-          // estructurado (ver QuoteDocumentCard) — el resto de la
-          // conversación (preguntas de aclaración, turnos previos) sigue
-          // renderizándose como texto Markdown normal.
-          if (isLastMessage && !isSending && canExportPdf && quote) {
-            return <QuoteDocumentCard key={index} quote={quote} quoteId={quoteId} onQuoteUpdate={onQuoteUpdate} />;
-          }
-
-          if (message.content.startsWith(INTAKE_MESSAGE_MARKER)) {
-            return <IntakeFormCard key={index} />;
+            // El último turno, cuando el presupuesto ya está completo, deja de
+            // verse como un mensaje de chat y se muestra como el documento
+            // estructurado (ver QuoteDocumentCard) — el resto de la
+            // conversación (preguntas de aclaración, turnos previos) sigue
+            // renderizándose como texto Markdown normal.
+            if (isLastMessage && !isSending && canExportPdf && quote) {
+              body = <QuoteDocumentCard quote={quote} quoteId={quoteId} onQuoteUpdate={onQuoteUpdate} />;
+            } else if (message.content.startsWith(INTAKE_MESSAGE_MARKER)) {
+              body = <IntakeFormCard />;
+            } else {
+              body = (
+                <div className="animate-fade-in-up text-foreground max-w-[72%] text-sm leading-relaxed">
+                  {message.content ? (
+                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                      {message.content}
+                    </ReactMarkdown>
+                  ) : isLastPending ? (
+                    <TypingIndicator />
+                  ) : null}
+                </div>
+              );
+            }
           }
 
           return (
-            <div key={index} className="animate-fade-in-up text-foreground max-w-[72%] text-sm leading-relaxed">
-              {message.content ? (
-                <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-                  {message.content}
-                </ReactMarkdown>
-              ) : isLastPending ? (
-                <TypingIndicator />
-              ) : null}
-            </div>
+            <Fragment key={index}>
+              {showDateSeparator ? <DateSeparator date={messageDate} /> : null}
+              {body}
+            </Fragment>
           );
         })}
         {isIntroTyping ? (

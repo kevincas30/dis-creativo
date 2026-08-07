@@ -23,7 +23,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         quotes={sidebarQuotes}
         user={{ displayName: user.displayName, email: user.email, avatarUrl: user.avatarUrl }}
       />
-      <main className="flex-1 overflow-hidden">{children}</main>
+      <main className="bg-black flex-1 overflow-hidden">{children}</main>
     </div>
   );
 }

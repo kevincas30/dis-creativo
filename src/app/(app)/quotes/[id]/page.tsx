@@ -21,6 +21,7 @@ export default async function QuotePage({
       client: true,
       lineItems: { orderBy: { sortOrder: "asc" } },
       messages: { orderBy: { createdAt: "asc" } },
+      notes: true,
     },
   });
 
@@ -31,6 +32,7 @@ export default async function QuotePage({
   const initialMessages = quote.messages.map((message) => ({
     role: (message.role === "assistant" ? "assistant" : "user") as "user" | "assistant",
     content: message.content,
+    createdAt: message.createdAt.toISOString(),
   }));
 
   return (
