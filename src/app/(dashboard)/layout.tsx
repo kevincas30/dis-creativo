@@ -9,7 +9,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   const user = await getCurrentUser();
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-screen flex-col overflow-hidden md:flex-row">
       <GlobalSidebar user={{ displayName: user.displayName, email: user.email, avatarUrl: user.avatarUrl }} />
       <main className="bg-black flex-1 overflow-hidden">{children}</main>
     </div>
