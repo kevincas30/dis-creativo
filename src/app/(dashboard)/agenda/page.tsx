@@ -30,10 +30,10 @@ export default async function AgendaComercialPage() {
   ]);
 
   return (
-    <div className="relative flex h-full flex-col overflow-y-auto px-6 py-10 sm:px-10 lg:px-16">
+    <div className="relative flex h-full flex-col overflow-y-auto px-3 py-6 sm:px-10 sm:py-10 lg:px-16">
       <DashboardBackground />
 
-      <div className="mx-auto w-full max-w-6xl flex-1 pb-12">
+      <div className="mx-auto flex w-full max-w-6xl min-h-0 flex-1 flex-col pb-4 lg:block lg:pb-12">
         <AgendaPageClient initialEvents={events.map(serializeEvent)} clients={clients} projects={projects} />
       </div>
     </div>

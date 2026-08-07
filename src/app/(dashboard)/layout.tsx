@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { getCurrentUser } from "@/lib/current-user";
-import GlobalSidebar from "@/components/dashboard/GlobalSidebar";
+import DashboardChrome from "@/components/dashboard/DashboardChrome";
 
 // Layout del dashboard principal del estudio — independiente del layout de
 // Presupuestos IA (src/app/presupuestos/layout.tsx). No obtiene la lista de
@@ -10,8 +10,9 @@ export default async function DashboardLayout({ children }: { children: ReactNod
 
   return (
     <div className="flex h-screen flex-col overflow-hidden md:flex-row">
-      <GlobalSidebar user={{ displayName: user.displayName, email: user.email, avatarUrl: user.avatarUrl }} />
-      <main className="bg-black flex-1 overflow-hidden">{children}</main>
+      <DashboardChrome user={{ displayName: user.displayName, email: user.email, avatarUrl: user.avatarUrl }}>
+        {children}
+      </DashboardChrome>
     </div>
   );
 }

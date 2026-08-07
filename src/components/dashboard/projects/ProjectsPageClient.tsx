@@ -1,12 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Plus } from "lucide-react";
 import ProjectsHeader from "@/components/dashboard/projects/ProjectsHeader";
 import ProjectsStatsGrid, { type ProjectsStats } from "@/components/dashboard/projects/ProjectsStatsGrid";
 import ProjectsBoard from "@/components/dashboard/projects/ProjectsBoard";
 import ProjectsEmptyState from "@/components/dashboard/projects/ProjectsEmptyState";
 import ProjectsActivityTimeline from "@/components/dashboard/projects/ProjectsActivityTimeline";
 import CreateProjectModal from "@/components/dashboard/projects/CreateProjectModal";
+import { useMobileHeaderAction } from "@/components/dashboard/MobileHeaderActionContext";
 import type { ProjectSnapshot } from "@/lib/project-presenter";
 
 // Quita acentos para que la búsqueda no dependa de tildes exactas ("panaderia" debe encontrar "Panadería").
@@ -29,6 +31,17 @@ export default function ProjectsPageClient({
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [ownerFilter, setOwnerFilter] = useState("");
+
+  useMobileHeaderAction(
+    <button
+      type="button"
+      onClick={() => setIsCreateOpen(true)}
+      aria-label="Nuevo proyecto"
+      className="shadow-soft flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 text-white transition-transform duration-150 active:scale-[0.92]"
+    >
+      <Plus className="h-4 w-4" strokeWidth={2.25} />
+    </button>,
+  );
 
   const owners = useMemo(
     () => Array.from(new Set(projects.map((project) => project.owner).filter((owner): owner is string => !!owner))),

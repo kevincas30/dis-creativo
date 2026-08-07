@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Plus } from "lucide-react";
 import AgendaHeader from "@/components/dashboard/agenda/AgendaHeader";
 import MonthCalendarGrid from "@/components/dashboard/agenda/MonthCalendarGrid";
 import WeekCalendarGrid from "@/components/dashboard/agenda/WeekCalendarGrid";
@@ -10,6 +11,7 @@ import DayEventsPanel from "@/components/dashboard/agenda/DayEventsPanel";
 import AgendaEmptyState from "@/components/dashboard/agenda/AgendaEmptyState";
 import CreateEventModal from "@/components/dashboard/agenda/CreateEventModal";
 import MobileAgendaView from "@/components/dashboard/agenda/mobile/MobileAgendaView";
+import { useMobileHeaderAction } from "@/components/dashboard/MobileHeaderActionContext";
 import {
   addDays,
   addMonths,
@@ -40,6 +42,17 @@ export default function AgendaPageClient({
   const [referenceDate, setReferenceDate] = useState(() => new Date());
   const [selectedDay, setSelectedDay] = useState(() => new Date());
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+
+  useMobileHeaderAction(
+    <button
+      type="button"
+      onClick={() => setIsCreateOpen(true)}
+      aria-label="Nuevo evento"
+      className="shadow-soft flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 text-white transition-transform duration-150 active:scale-[0.92]"
+    >
+      <Plus className="h-4 w-4" strokeWidth={2.25} />
+    </button>,
+  );
 
   const eventsByDay = useMemo(() => {
     const map = new Map<string, EventSnapshot[]>();
@@ -138,7 +151,7 @@ export default function AgendaPageClient({
   }
 
   return (
-    <div>
+    <div className="flex h-full min-h-0 flex-col lg:block lg:h-auto">
       {/* Desktop/tablet: Mes/Semana/Día/Lista + panel lateral, sin cambios. */}
       <div className="hidden space-y-6 lg:block">
         <AgendaHeader
@@ -173,9 +186,9 @@ export default function AgendaPageClient({
         </div>
       </div>
 
-      {/* Móvil: experiencia tipo Calendario de iPhone (mes con puntos + vista Día a pantalla completa). */}
-      <div className="lg:hidden">
-        <MobileAgendaView eventsByDay={eventsByDay} onCreateClick={() => setIsCreateOpen(true)} />
+      {/* Móvil: experiencia tipo Calendario de iPhone (scroll continuo de meses + vista Día a pantalla completa). */}
+      <div className="h-full min-h-0 lg:hidden">
+        <MobileAgendaView eventsByDay={eventsByDay} />
       </div>
 
       <CreateEventModal

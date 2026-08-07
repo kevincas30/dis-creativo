@@ -1,10 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Plus } from "lucide-react";
 import ClientesHeader from "@/components/dashboard/clientes/ClientesHeader";
 import ClientCard from "@/components/dashboard/clientes/ClientCard";
 import ClientesEmptyState from "@/components/dashboard/clientes/ClientesEmptyState";
 import CreateClientModal from "@/components/dashboard/clientes/CreateClientModal";
+import { useMobileHeaderAction } from "@/components/dashboard/MobileHeaderActionContext";
 import type { ClientCardData } from "@/lib/client-relations";
 
 function normalize(value: string): string {
@@ -20,6 +22,17 @@ export default function ClientesPageClient({ clients }: { clients: ClientCardDat
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [countryFilter, setCountryFilter] = useState("");
+
+  useMobileHeaderAction(
+    <button
+      type="button"
+      onClick={() => setIsCreateOpen(true)}
+      aria-label="Nuevo cliente"
+      className="shadow-soft flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 text-white transition-transform duration-150 active:scale-[0.92]"
+    >
+      <Plus className="h-4 w-4" strokeWidth={2.25} />
+    </button>,
+  );
 
   const countries = useMemo(
     () => Array.from(new Set(clients.map((client) => client.country).filter((country): country is string => !!country))).sort(),

@@ -70,7 +70,7 @@ export default function ProjectsHeader({
         <button
           type="button"
           onClick={onCreateClick}
-          className="shadow-soft inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-medium text-white transition-all duration-200 ease-out hover:-translate-y-px hover:bg-blue-500 active:translate-y-0 active:scale-[0.97] active:bg-blue-700 focus-visible:ring-2 focus-visible:ring-blue-400/50 focus-visible:outline-none"
+          className="shadow-soft hidden h-10 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-medium text-white transition-all duration-200 ease-out hover:-translate-y-px hover:bg-blue-500 active:translate-y-0 active:scale-[0.97] active:bg-blue-700 focus-visible:ring-2 focus-visible:ring-blue-400/50 focus-visible:outline-none md:inline-flex"
         >
           <Plus className="h-4 w-4" strokeWidth={2} />
           Nuevo proyecto

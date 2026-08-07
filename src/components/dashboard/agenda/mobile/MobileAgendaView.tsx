@@ -1,79 +1,106 @@
 "use client";
 
-import { useState } from "react";
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
-import { addMonths, formatMonthLabel, getMonthGridDays } from "@/lib/dashboard-agenda-dates";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { addMonths, dayKey, formatMonthLabel, getMonthGridDays, isSameDay, WEEKDAY_LABELS } from "@/lib/dashboard-agenda-dates";
 import MobileMonthGrid from "@/components/dashboard/agenda/mobile/MobileMonthGrid";
 import MobileDayView from "@/components/dashboard/agenda/mobile/MobileDayView";
 import type { EventSnapshot } from "@/lib/event-presenter";
 
-// Experiencia móvil tipo Calendario de iPhone: mes con puntos (sin texto) +
-// vista Día a pantalla completa al tocar. Estado de navegación totalmente
-// independiente del desktop (que sigue usando Mes/Semana/Día/Lista + panel
-// lateral) — solo comparten los eventos ya cargados.
-export default function MobileAgendaView({
-  eventsByDay,
-  onCreateClick,
-}: {
-  eventsByDay: Map<string, EventSnapshot[]>;
-  onCreateClick: () => void;
-}) {
-  const [referenceMonth, setReferenceMonth] = useState(() => new Date());
+const MONTHS_BEFORE = 2;
+const MONTHS_AFTER = 2;
+
+function offsetWithin(container: HTMLElement, target: HTMLElement): number {
+  return target.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop;
+}
+
+// Experiencia móvil tipo Calendario de iPhone: scroll vertical continuo de
+// varios meses (sin límite de card ni margen), con el encabezado de días fijo
+// arriba y una etiqueta de mes que se sincroniza con lo que está visible.
+// Entra siempre en el mes actual, con MONTHS_BEFORE/MONTHS_AFTER meses de
+// margen a cada lado. Estado de navegación totalmente independiente del desktop.
+export default function MobileAgendaView({ eventsByDay }: { eventsByDay: Map<string, EventSnapshot[]> }) {
+  const todayMonthStart = useMemo(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  }, []);
+
+  const months = useMemo(
+    () => Array.from({ length: MONTHS_BEFORE + MONTHS_AFTER + 1 }, (_, i) => addMonths(todayMonthStart, i - MONTHS_BEFORE)),
+    [todayMonthStart],
+  );
+
   const [dayViewDate, setDayViewDate] = useState<Date | null>(null);
+  const [visibleMonthLabel, setVisibleMonthLabel] = useState(() => formatMonthLabel(todayMonthStart));
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  function scrollToCurrentMonth(behavior: "instant" | "smooth") {
+    const container = scrollRef.current;
+    const target = container?.querySelector<HTMLElement>('[data-current-month="true"]');
+    if (!container || !target) return;
+    container.scrollTo({ top: offsetWithin(container, target), behavior });
+  }
+
+  // Al montar, saltar directo al mes actual sin animar (sin importar cuántos
+  // meses de margen haya antes en el scroll).
+  useEffect(() => {
+    scrollToCurrentMonth("instant");
+  }, []);
+
+  // Sincroniza la etiqueta de mes flotante con la sección más visible,
+  // igual que el encabezado de mes de Calendario de iPhone al hacer scroll.
+  useEffect(() => {
+    const container = scrollRef.current;
+    if (!container) return;
+    const sections = Array.from(container.querySelectorAll<HTMLElement>("[data-month-label]"));
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const mostVisible = entries.filter((entry) => entry.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+        const label = mostVisible?.target instanceof HTMLElement ? mostVisible.target.dataset.monthLabel : undefined;
+        if (label) setVisibleMonthLabel(label);
+      },
+      { root: container, threshold: [0.25, 0.5, 0.75] },
+    );
+    sections.forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  }, [months]);
 
   return (
-    <div className="space-y-4">
-      <div className="animate-fade-in-up flex items-center justify-between gap-3">
+    <div className="flex h-full flex-col">
+      <div className="animate-fade-in-up flex shrink-0 items-center justify-between gap-3 px-1 pb-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Agenda comercial</h1>
-          <p className="text-muted-foreground mt-1 text-sm">Organiza reuniones, entregas y seguimientos del estudio</p>
+          <p className="text-muted-foreground mt-1 text-sm">{visibleMonthLabel}</p>
         </div>
-
         <button
           type="button"
-          onClick={onCreateClick}
-          aria-label="Nuevo evento"
-          className="shadow-soft flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white transition-all duration-200 ease-out active:scale-[0.95] active:bg-blue-700"
+          onClick={() => scrollToCurrentMonth("smooth")}
+          className="liquid-glass text-muted-foreground hover:text-foreground shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors duration-150"
         >
-          <Plus className="h-5 w-5" strokeWidth={2} />
+          Hoy
         </button>
       </div>
 
-      <div className="flex items-center justify-between gap-3">
-        <div className="liquid-glass flex items-center gap-0.5 rounded-xl p-1">
-          <button
-            type="button"
-            onClick={() => setReferenceMonth((prev) => addMonths(prev, -1))}
-            aria-label="Mes anterior"
-            className="text-muted-foreground hover:bg-foreground/5 flex h-7 w-7 items-center justify-center rounded-lg transition-colors duration-150"
-          >
-            <ChevronLeft className="h-4 w-4" strokeWidth={1.75} />
-          </button>
-          <button
-            type="button"
-            onClick={() => setReferenceMonth(new Date())}
-            className="text-muted-foreground hover:bg-foreground/5 rounded-lg px-2.5 py-1 text-xs font-medium transition-colors duration-150"
-          >
-            Hoy
-          </button>
-          <button
-            type="button"
-            onClick={() => setReferenceMonth((prev) => addMonths(prev, 1))}
-            aria-label="Mes siguiente"
-            className="text-muted-foreground hover:bg-foreground/5 flex h-7 w-7 items-center justify-center rounded-lg transition-colors duration-150"
-          >
-            <ChevronRight className="h-4 w-4" strokeWidth={1.75} />
-          </button>
-        </div>
-        <span className="text-sm font-medium">{formatMonthLabel(referenceMonth)}</span>
+      <div className="border-surface-border grid shrink-0 grid-cols-7 border-b px-1 pb-2">
+        {WEEKDAY_LABELS.map((label, index) => (
+          <div key={`${label}-${index}`} className="text-muted-foreground text-center text-xs font-medium tracking-wide uppercase">
+            {label}
+          </div>
+        ))}
       </div>
 
-      <MobileMonthGrid
-        days={getMonthGridDays(referenceMonth)}
-        referenceDate={referenceMonth}
-        eventsByDay={eventsByDay}
-        onSelectDay={setDayViewDate}
-      />
+      <div ref={scrollRef} className="flex-1 space-y-6 overflow-y-auto px-1 pt-4">
+        {months.map((month) => {
+          const key = dayKey(month);
+          const isCurrentMonth = isSameDay(month, todayMonthStart);
+
+          return (
+            <div key={key} data-month-label={formatMonthLabel(month)} data-current-month={isCurrentMonth || undefined}>
+              <p className="text-muted-foreground mb-2 px-1 text-xs font-semibold tracking-wide uppercase">{formatMonthLabel(month)}</p>
+              <MobileMonthGrid days={getMonthGridDays(month)} referenceDate={month} eventsByDay={eventsByDay} onSelectDay={setDayViewDate} />
+            </div>
+          );
+        })}
+      </div>
 
       {dayViewDate ? (
         <MobileDayView date={dayViewDate} eventsByDay={eventsByDay} onClose={() => setDayViewDate(null)} onChangeDay={setDayViewDate} />
