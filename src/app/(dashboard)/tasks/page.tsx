@@ -6,7 +6,7 @@ export default function TasksPage() {
     <ComingSoon
       icon={ListChecks}
       title="Tareas"
-      description="Pendientes del equipo organizados por proyecto y prioridad. Estamos preparando este módulo."
+      description="Este espacio reunirá los pendientes de tus proyectos. El módulo aún no está disponible; mientras tanto, consulta en Inicio los compromisos de hoy y los proyectos que necesitan atención."
     />
   );
 }

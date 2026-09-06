@@ -6,7 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { X } from "lucide-react";
 import UserMenu from "@/components/layout/UserMenu";
-import { ACTIVE_NAV_GLASS_VARS, LIQUID_GLASS_VARS, NAV_ITEMS, type SidebarUser } from "@/components/dashboard/GlobalSidebar";
+import { ACTIVE_NAV_GLASS_VARS, LIQUID_GLASS_VARS, NAV_ITEMS, MoreNavigation, type SidebarUser } from "@/components/dashboard/GlobalSidebar";
 
 const SWIPE_CLOSE_THRESHOLD_PX = 60;
 
@@ -88,6 +88,7 @@ export default function MobileDrawer({
                 href={item.href}
                 target={item.openInNewTab ? "_blank" : undefined}
                 rel={item.openInNewTab ? "noopener noreferrer" : undefined}
+                aria-current={isActive ? "page" : undefined}
                 onClick={onClose}
                 style={isActive ? ACTIVE_NAV_GLASS_VARS : undefined}
                 className={`focus-visible:ring-accent/40 flex items-center gap-3 rounded-xl border px-3.5 py-2.5 text-sm transition-all duration-150 focus-visible:ring-2 focus-visible:outline-none ${
@@ -101,6 +102,7 @@ export default function MobileDrawer({
               </Link>
             );
           })}
+          <MoreNavigation pathname={pathname} onNavigate={onClose} />
         </nav>
 
         <div className="border-surface-border border-t p-3 pb-[max(env(safe-area-inset-bottom),0.75rem)]">

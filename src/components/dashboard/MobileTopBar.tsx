@@ -2,12 +2,12 @@
 
 import { usePathname } from "next/navigation";
 import { Menu } from "lucide-react";
-import { LIQUID_GLASS_VARS, NAV_ITEMS } from "@/components/dashboard/GlobalSidebar";
+import { LIQUID_GLASS_VARS, NAV_ITEMS, SECONDARY_NAV_ITEMS } from "@/components/dashboard/GlobalSidebar";
 import { useMobileHeaderActionSlot } from "@/components/dashboard/MobileHeaderActionContext";
 
 export default function MobileTopBar({ onMenuClick }: { onMenuClick: () => void }) {
   const pathname = usePathname();
-  const sectionTitle = NAV_ITEMS.find((item) => item.isActive(pathname))?.label ?? "Diseño Creativo";
+  const sectionTitle = [...NAV_ITEMS, ...SECONDARY_NAV_ITEMS].find((item) => item.isActive(pathname))?.label ?? "Diseño Creativo";
   const action = useMobileHeaderActionSlot();
 
   return (

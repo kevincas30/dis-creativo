@@ -12,8 +12,7 @@ import {
   ListChecks,
   FileText,
   CreditCard,
-  UsersRound,
-  BarChart3,
+  MoreHorizontal,
   PanelLeftClose,
   type LucideIcon,
 } from "lucide-react";
@@ -47,11 +46,9 @@ export type NavItem = {
 
 // Sidebar del dashboard principal del estudio — independiente del sidebar
 // interno de Presupuestos IA (src/components/sidebar/Sidebar.tsx). No
-// comparte lista de presupuestos ni acciones de ese módulo; "Presupuestos IA"
-// abre en una pestaña nueva para no perder el dashboard principal de vista.
+// comparte lista de presupuestos ni acciones de ese módulo.
 export const NAV_ITEMS: NavItem[] = [
   { label: "Inicio", href: "/", icon: Home, isActive: (p) => p === "/" },
-  { label: "Agenda comercial", href: "/agenda", icon: Calendar, isActive: (p) => p.startsWith("/agenda") },
   { label: "Clientes", href: "/clientes", icon: Users, isActive: (p) => p.startsWith("/clientes") },
   { label: "Proyectos", href: "/projects", icon: FolderKanban, isActive: (p) => p.startsWith("/projects") },
   { label: "Tareas", href: "/tasks", icon: ListChecks, isActive: (p) => p.startsWith("/tasks") },
@@ -60,16 +57,38 @@ export const NAV_ITEMS: NavItem[] = [
     href: "/presupuestos",
     icon: FileText,
     isActive: (p) => p.startsWith("/presupuestos"),
-    openInNewTab: true,
   },
-  { label: "Pagos", href: "/payments", icon: CreditCard, isActive: (p) => p.startsWith("/payments") },
-  { label: "Equipo", href: "/team", icon: UsersRound, isActive: (p) => p.startsWith("/team") },
-  { label: "Reportes", href: "/reports", icon: BarChart3, isActive: (p) => p.startsWith("/reports") },
 ];
+
+export const SECONDARY_NAV_ITEMS: NavItem[] = [
+  { label: "Agenda comercial", href: "/agenda", icon: Calendar, isActive: (p) => p.startsWith("/agenda") },
+  { label: "Pagos", href: "/payments", icon: CreditCard, isActive: (p) => p.startsWith("/payments") },
+];
+
+export function MoreNavigation({ pathname, onNavigate, defaultOpen = false }: { pathname: string; onNavigate?: () => void; defaultOpen?: boolean }) {
+  return (
+    <details key={pathname} open={defaultOpen || SECONDARY_NAV_ITEMS.some((item) => item.isActive(pathname))} className="group mt-4 border-t border-surface-border pt-3">
+      <summary className="text-muted-foreground hover:text-foreground cursor-pointer rounded-xl px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
+        Más
+      </summary>
+      <div className="mt-1 space-y-1">
+        {SECONDARY_NAV_ITEMS.map((item) => (
+          <Link key={item.href} href={item.href} onClick={onNavigate} aria-current={item.isActive(pathname) ? "page" : undefined}
+            style={item.isActive(pathname) ? ACTIVE_NAV_GLASS_VARS : undefined}
+            className={`flex items-center gap-2.5 rounded-xl border px-3 py-2.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${item.isActive(pathname) ? "liquid-glass text-white font-medium" : "border-transparent text-muted-foreground hover:bg-foreground/5 hover:text-foreground"}`}>
+            <item.icon className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+            {item.label}
+          </Link>
+        ))}
+      </div>
+    </details>
+  );
+}
 
 export default function GlobalSidebar({ user }: { user: SidebarUser }) {
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [showMore, setShowMore] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   return (
@@ -106,6 +125,7 @@ export default function GlobalSidebar({ user }: { user: SidebarUser }) {
                     target={item.openInNewTab ? "_blank" : undefined}
                     rel={item.openInNewTab ? "noopener noreferrer" : undefined}
                     onClick={(event) => event.stopPropagation()}
+                    aria-current={isActive ? "page" : undefined}
                     aria-label={item.label}
                     title={item.label}
                     style={isActive ? ACTIVE_NAV_GLASS_VARS : undefined}
@@ -117,6 +137,10 @@ export default function GlobalSidebar({ user }: { user: SidebarUser }) {
                   </Link>
                 );
               })}
+              <button type="button" aria-label="Más opciones de navegación" title="Más" onClick={(event) => { event.stopPropagation(); setShowMore(true); setIsCollapsed(false); }}
+                className="text-muted-foreground hover:bg-foreground/5 hover:text-foreground flex h-9 w-9 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
+                <MoreHorizontal className="h-4 w-4" />
+              </button>
             </nav>
 
             <Avatar name={user.displayName} avatarUrl={user.avatarUrl} className="h-9 w-9 text-xs" />
@@ -150,6 +174,7 @@ export default function GlobalSidebar({ user }: { user: SidebarUser }) {
                     href={item.href}
                     target={item.openInNewTab ? "_blank" : undefined}
                     rel={item.openInNewTab ? "noopener noreferrer" : undefined}
+                    aria-current={isActive ? "page" : undefined}
                     style={isActive ? ACTIVE_NAV_GLASS_VARS : undefined}
                     className={`focus-visible:ring-accent/40 flex items-center gap-2.5 rounded-xl border px-3 py-2 text-sm transition-all duration-200 ease-out focus-visible:ring-2 focus-visible:outline-none ${
                       isActive
@@ -162,6 +187,7 @@ export default function GlobalSidebar({ user }: { user: SidebarUser }) {
                   </Link>
                 );
               })}
+              <MoreNavigation pathname={pathname} defaultOpen={showMore} />
             </nav>
 
             <div className="border-surface-border border-t p-2">

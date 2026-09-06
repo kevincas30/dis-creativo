@@ -69,6 +69,7 @@ export async function createEvent(formData: FormData) {
     select: EVENT_SELECT,
   });
 
+  revalidatePath("/");
   revalidatePath("/agenda");
 
   return serializeEvent(event);

@@ -57,6 +57,7 @@ export async function createProject(formData: FormData) {
     },
   });
 
+  revalidatePath("/");
   revalidatePath("/projects");
   redirect(`/projects/${project.id}`);
 }
@@ -89,6 +90,7 @@ export async function updateProject(projectId: string, formData: FormData) {
     },
   });
 
+  revalidatePath("/");
   revalidatePath("/projects");
   revalidatePath(`/projects/${projectId}`);
 
@@ -105,6 +107,7 @@ export async function deleteProject(projectId: string) {
 
   await prisma.project.delete({ where: { id: projectId } });
 
+  revalidatePath("/");
   revalidatePath("/projects");
   redirect("/projects");
 }
