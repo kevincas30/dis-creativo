@@ -1,12 +1,11 @@
-import { ListChecks } from "lucide-react";
-import ComingSoon from "@/components/dashboard/ComingSoon";
-
-export default function TasksPage() {
-  return (
-    <ComingSoon
-      icon={ListChecks}
-      title="Tareas"
-      description="Este espacio reunirá los pendientes de tus proyectos. El módulo aún no está disponible; mientras tanto, consulta en Inicio los compromisos de hoy y los proyectos que necesitan atención."
-    />
-  );
+import Link from "next/link";
+import { prisma } from "@/lib/prisma";
+import { getCurrentUser } from "@/lib/current-user";
+import WorkList from "@/components/dashboard/WorkList";
+import DashboardBackground from "@/components/dashboard/DashboardBackground";
+export default async function TasksPage({ searchParams }: { searchParams: Promise<{ completed?: string }> }) {
+  const user = await getCurrentUser();
+  const completed = (await searchParams).completed === "1";
+  const items = await prisma.workItem.findMany({ where: { project: { userId: user.id }, kind: "TASK", completedAt: completed ? { not: null } : null }, include: { project: { select: { name: true } }, period: { select: { label: true } } }, orderBy: [{ dueDate: "asc" }, { createdAt: "asc" }] });
+  return <div className="relative h-full overflow-y-auto px-6 py-10 sm:px-10 lg:px-16"><DashboardBackground /><div className="mx-auto max-w-5xl space-y-5"><h1 className="text-2xl font-semibold">Tareas</h1><p className="text-sm text-muted-foreground">Trabajo concreto de tus proyectos y periodos. Añade tareas desde la ficha de cada proyecto.</p><Link href={completed ? "/tasks" : "/tasks?completed=1"} className="inline-block text-sm underline">{completed ? "Ver pendientes" : "Ver completadas"}</Link><section className="liquid-glass rounded-2xl p-5"><WorkList items={items.map((w) => ({ ...w, dueDate: w.dueDate?.toISOString() ?? null, completedAt: w.completedAt?.toISOString() ?? null }))} /></section></div></div>;
 }

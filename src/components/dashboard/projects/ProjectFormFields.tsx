@@ -29,9 +29,11 @@ export type ProjectFormDefaults = {
 export default function ProjectFormFields({
   defaultValues = {},
   includeStatus = false,
+  hideClient = false,
 }: {
   defaultValues?: ProjectFormDefaults;
   includeStatus?: boolean;
+  hideClient?: boolean;
 }) {
   const dueDateValue = defaultValues.dueDate ? defaultValues.dueDate.slice(0, 10) : "";
 
@@ -49,7 +51,7 @@ export default function ProjectFormFields({
           />
         </Field>
 
-        <Field label="Cliente" htmlFor="client">
+        {!hideClient && <Field label="Cliente" htmlFor="client">
           <input
             id="client"
             name="client"
@@ -58,7 +60,7 @@ export default function ProjectFormFields({
             placeholder="Mariscos Palace"
             className={inputClassName}
           />
-        </Field>
+        </Field>}
 
         <Field label="Tipo de proyecto" htmlFor="type">
           <input

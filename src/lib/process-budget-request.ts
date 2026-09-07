@@ -448,7 +448,7 @@ export async function processBudgetRequest(message: string, quoteId: string): Pr
     // resto (país, servicios) todavía falte.
     if (payload.client.name) {
       const existing = await tx.client.findFirst({
-        where: { name: { equals: payload.client.name, mode: "insensitive" } },
+        where: { name: { equals: payload.client.name, mode: "insensitive" }, archivedAt: null },
       });
 
       const countryConfig = resolveCountry(payload.client.country);

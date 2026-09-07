@@ -11,7 +11,7 @@ export type ClientCardData = ClientSnapshot & {
   lastContact: string | null;
 };
 
-type ProjectRow = { client: string; updatedAt: Date };
+type ProjectRow = { clientId?: string | null; client: string; updatedAt: Date };
 type QuoteRow = { clientId: string | null; updatedAt: Date };
 type EventRow = { clientId: string | null; startAt: Date };
 
@@ -39,7 +39,7 @@ export function buildClientCards(
 
   return clients.map((client) => {
     const snapshot = serializeClient(client);
-    const matchedProjects = projects.filter((project) => projectMatchesClient(project.client, snapshot));
+    const matchedProjects = projects.filter((project) => (project.clientId ? project.clientId === client.id : projectMatchesClient(project.client, snapshot)));
     const projectLast = matchedProjects.reduce<Date | null>(
       (max, project) => (!max || project.updatedAt > max ? project.updatedAt : max),
       null,

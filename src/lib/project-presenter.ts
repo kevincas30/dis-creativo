@@ -4,6 +4,11 @@
 import type { ProjectStatus } from "@/generated/prisma/enums";
 
 export type ProjectInput = {
+  kind?: "ONE_OFF" | "RECURRING";
+  relationshipStatus?: "ACTIVE" | "PAUSED" | "CLOSED" | "CANCELLED";
+  clientId?: string | null;
+  quoteId?: string | null;
+  currentPeriod?: { id: string; label: string; status: ProjectStatus; dueDate: Date | null } | null;
   id: string;
   name: string;
   client: string;
@@ -22,6 +27,13 @@ export type ProjectSnapshot = ReturnType<typeof serializeProject>;
 export function serializeProject(project: ProjectInput) {
   return {
     id: project.id,
+    kind: project.kind ?? "ONE_OFF",
+    relationshipStatus: project.relationshipStatus ?? "ACTIVE",
+    clientId: project.clientId ?? null,
+    quoteId: project.quoteId ?? null,
+    currentPeriod: project.currentPeriod
+      ? { ...project.currentPeriod, dueDate: project.currentPeriod.dueDate?.toISOString() ?? null }
+      : null,
     name: project.name,
     client: project.client,
     type: project.type,

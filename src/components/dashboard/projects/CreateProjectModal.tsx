@@ -1,6 +1,7 @@
 "use client";
 
-import { useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
+import { getProjectOptions } from "@/app/(dashboard)/projects/work-actions";
 import { FolderPlus } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import Button from "@/components/ui/Button";
@@ -11,15 +12,21 @@ export default function CreateProjectModal({
   isOpen,
   onClose,
   defaultClient,
+  defaultClientId,
 }: {
   isOpen: boolean;
   onClose: () => void;
   defaultClient?: string;
+  defaultClientId?: string;
 }) {
   const [isPending, startTransition] = useTransition();
 
+  const [options, setOptions] = useState<Awaited<ReturnType<typeof getProjectOptions>>>({ clients: [], quotes: [] });
+  const [clientId, setClientId] = useState(defaultClientId ?? "");
+  useEffect(() => { if (isOpen) { let active = true; getProjectOptions().then((result) => { if (active) setOptions(result); }).catch(() => {}); return () => { active = false; }; } }, [isOpen]);
   function handleSubmit(formData: FormData) {
     startTransition(async () => {
+      if (clientId) formData.set("client", options.clients.find((c) => c.id === clientId)?.name ?? defaultClient ?? "");
       await createProject(formData);
     });
   }
@@ -37,8 +44,11 @@ export default function CreateProjectModal({
           </div>
         </div>
 
-        <div className="mt-5">
-          <ProjectFormFields defaultValues={defaultClient ? { client: defaultClient } : undefined} />
+        <div className="mt-5 space-y-4">
+          <label className="grid gap-2 text-sm">Modalidad<select name="kind" className="rounded-lg bg-surface-solid border border-surface-border p-2"><option value="ONE_OFF">Proyecto único</option><option value="RECURRING">Proyecto recurrente / mensual</option></select></label>
+          <label className="grid gap-2 text-sm">Vincular cliente<select name="clientId" value={clientId} onChange={(e) => setClientId(e.target.value)} className="rounded-lg bg-surface-solid border border-surface-border p-2"><option value="">Sin vínculo (nombre libre abajo)</option>{options.clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
+          <label className="grid gap-2 text-sm">Presupuesto de origen<select name="quoteId" className="rounded-lg bg-surface-solid border border-surface-border p-2"><option value="">Sin presupuesto</option>{options.quotes.filter((q) => q.clientId === clientId).map((q) => <option key={q.id} value={q.id}>{q.createdAt.slice(0, 10)} · {q.id.slice(0, 8)}</option>)}</select></label>
+          <ProjectFormFields hideClient={Boolean(clientId)} defaultValues={defaultClient ? { client: defaultClient } : undefined} />
         </div>
 
         <div className="mt-6 flex justify-end gap-2">

@@ -20,6 +20,7 @@ export type ClientInput = {
   defaultCurrency: Currency | null;
   status: ClientStatus;
   notes: string | null;
+  archivedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -56,6 +57,7 @@ export function serializeClient(client: ClientInput) {
     defaultCurrency: client.defaultCurrency,
     status: client.status,
     notes: client.notes,
+    archivedAt: client.archivedAt?.toISOString() ?? null,
     createdAt: client.createdAt.toISOString(),
     updatedAt: client.updatedAt.toISOString(),
   };

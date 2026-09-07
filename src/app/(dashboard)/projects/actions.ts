@@ -45,9 +45,17 @@ export async function createProject(formData: FormData) {
     throw new Error("El nombre y el cliente son obligatorios.");
   }
 
-  const project = await prisma.project.create({
+  const clientId = readTextField(formData, "clientId");
+  const quoteId = readTextField(formData, "quoteId");
+  const kind = readTextField(formData, "kind") ?? "ONE_OFF";
+  if (!["ONE_OFF", "RECURRING"].includes(kind)) throw new Error("Tipo de proyecto inválido.");
+  if (clientId && !await prisma.client.findFirst({ where: { id: clientId, archivedAt: null } })) throw new Error("Cliente no disponible.");
+  if (quoteId && (!clientId || !await prisma.quote.findFirst({ where: { id: quoteId, clientId, userId: user.id } }))) throw new Error("Presupuesto no válido para este cliente.");
+  const project = await prisma.$transaction(async (tx) => {
+    const created = await tx.project.create({
     data: {
       userId: user.id,
+      clientId, quoteId, kind: kind as "ONE_OFF" | "RECURRING",
       name,
       client,
       type: readTextField(formData, "type"),
@@ -55,6 +63,10 @@ export async function createProject(formData: FormData) {
       description: readTextField(formData, "description"),
       dueDate: readDueDate(formData),
     },
+  });
+
+    await tx.activityRecord.create({ data: { actorId: user.id, projectId: created.id, clientId, action: "PROJECT_CREATED", description: `Proyecto creado: ${created.name}` } });
+    return created;
   });
 
   revalidatePath("/");
@@ -76,7 +88,8 @@ export async function updateProject(projectId: string, formData: FormData) {
     throw new Error("No autorizado.");
   }
 
-  const project = await prisma.project.update({
+  const project = await prisma.$transaction(async (tx) => {
+  const updated = await tx.project.update({
     where: { id: projectId },
     data: {
       name,
@@ -85,11 +98,14 @@ export async function updateProject(projectId: string, formData: FormData) {
       owner: readTextField(formData, "owner"),
       description: readTextField(formData, "description"),
       dueDate: readDueDate(formData),
-      status: readStatus(formData) ?? existing.status,
+      status: existing.kind === "RECURRING" ? existing.status : (readStatus(formData) ?? existing.status),
       progress: readProgress(formData) ?? existing.progress,
     },
   });
 
+    if (updated.status !== existing.status) await tx.activityRecord.create({ data: { actorId: user.id, projectId, clientId: existing.clientId, action: "STATUS_CHANGED", description: `${existing.status} → ${updated.status}` } });
+    return updated;
+  });
   revalidatePath("/");
   revalidatePath("/projects");
   revalidatePath(`/projects/${projectId}`);
@@ -105,6 +121,8 @@ export async function deleteProject(projectId: string) {
     throw new Error("No autorizado.");
   }
 
+  const references = await prisma.project.findUniqueOrThrow({ where: { id: projectId }, include: { _count: { select: { events: true, periods: true, payments: true, workItems: true, assignments: true, activityRecords: true } } } });
+  if (Object.values(references._count).some(Boolean) || references.clientId || references.quoteId) throw new Error("Este proyecto tiene historial o relaciones. Ciérralo o cancélalo para conservar sus datos.");
   await prisma.project.delete({ where: { id: projectId } });
 
   revalidatePath("/");

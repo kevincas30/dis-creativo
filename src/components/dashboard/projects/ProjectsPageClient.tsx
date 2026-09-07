@@ -6,7 +6,7 @@ import ProjectsHeader from "@/components/dashboard/projects/ProjectsHeader";
 import ProjectsStatsGrid, { type ProjectsStats } from "@/components/dashboard/projects/ProjectsStatsGrid";
 import ProjectsBoard from "@/components/dashboard/projects/ProjectsBoard";
 import ProjectsEmptyState from "@/components/dashboard/projects/ProjectsEmptyState";
-import ProjectsActivityTimeline from "@/components/dashboard/projects/ProjectsActivityTimeline";
+
 import CreateProjectModal from "@/components/dashboard/projects/CreateProjectModal";
 import { useMobileHeaderAction } from "@/components/dashboard/MobileHeaderActionContext";
 import type { ProjectSnapshot } from "@/lib/project-presenter";
@@ -51,7 +51,7 @@ export default function ProjectsPageClient({
   const filteredProjects = useMemo(() => {
     const term = normalize(search);
     return projects.filter((project) => {
-      if (statusFilter && project.status !== statusFilter) return false;
+      if (statusFilter && (project.kind === "RECURRING" ? project.currentPeriod?.status : project.status) !== statusFilter) return false;
       if (ownerFilter && project.owner !== ownerFilter) return false;
       if (term && !normalize(project.name).includes(term) && !normalize(project.client).includes(term)) return false;
       return true;
@@ -88,7 +88,7 @@ export default function ProjectsPageClient({
 
       <ProjectsBoard projects={filteredProjects} />
 
-      <ProjectsActivityTimeline projects={projects} />
+
 
       <CreateProjectModal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} />
     </div>

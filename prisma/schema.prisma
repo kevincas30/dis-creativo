@@ -39,6 +39,33 @@ enum ProjectStatus {
   IN_PROGRESS
   REVIEW
   DONE
+  DELIVERED
+  CLOSED
+  PAUSED
+  CANCELLED
+}
+
+enum ProjectKind {
+  ONE_OFF
+  RECURRING
+}
+
+enum RelationshipStatus {
+  ACTIVE
+  PAUSED
+  CLOSED
+  CANCELLED
+}
+
+enum WorkItemKind {
+  TASK
+  DELIVERABLE
+}
+
+enum WorkPriority {
+  LOW
+  NORMAL
+  HIGH
 }
 
 enum EventType {
@@ -66,9 +93,12 @@ model User {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  quotes   Quote[]
-  projects Project[]
-  events   Event[]
+  quotes           Quote[]
+  projects         Project[]
+  events           Event[]
+  assignments      WorkAssignment[]
+  recordedPayments Payment[]
+  activityRecords  ActivityRecord[]
 
   @@map("users")
 }
@@ -96,8 +126,11 @@ model Client {
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 
-  quotes Quote[]
-  events Event[]
+  quotes          Quote[]
+  events          Event[]
+  archivedAt      DateTime?
+  projects        Project[]
+  activityRecords ActivityRecord[]
 
   @@index([name])
   @@index([company])
@@ -174,12 +207,12 @@ model Quote {
   /// Respuestas del cuestionario guiado por servicio (estructura dinámica).
   questionnaireAnswers Json?
 
-  subtotal      Decimal       @default(0) @db.Decimal(10, 2)
-  discountType  DiscountType?
-  discountValue Decimal?      @db.Decimal(10, 2)
+  subtotal       Decimal       @default(0) @db.Decimal(10, 2)
+  discountType   DiscountType?
+  discountValue  Decimal?      @db.Decimal(10, 2)
   discountReason String?
-  taxAmount      Decimal      @default(0) @db.Decimal(10, 2)
-  total          Decimal      @default(0) @db.Decimal(10, 2)
+  taxAmount      Decimal       @default(0) @db.Decimal(10, 2)
+  total          Decimal       @default(0) @db.Decimal(10, 2)
 
   /// Explicación en lenguaje claro de cómo se calculó el precio (uso interno / opcional en PDF).
   calculationExplanation String? @db.Text
@@ -205,6 +238,8 @@ model Quote {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  projects Project[]
 
   lineItems     QuoteLineItem[]
   statusHistory QuoteStatusHistory[]
@@ -253,13 +288,13 @@ model QuoteLineItem {
   serviceId String?
   service   Service? @relation(fields: [serviceId], references: [id])
 
-  description String
-  quantity    Decimal @default(1) @db.Decimal(10, 2)
-  unitPrice   Decimal @db.Decimal(10, 2)
-  lineTotal   Decimal @db.Decimal(10, 2)
+  description     String
+  quantity        Decimal  @default(1) @db.Decimal(10, 2)
+  unitPrice       Decimal  @db.Decimal(10, 2)
+  lineTotal       Decimal  @db.Decimal(10, 2)
   /// % de descuento por volumen aplicado a esta línea (catálogo oficial). Nulo si no aplica.
   discountPercent Decimal? @db.Decimal(5, 2)
-  sortOrder   Int     @default(0)
+  sortOrder       Int      @default(0)
 
   @@map("quote_line_items")
 }
@@ -295,8 +330,24 @@ model Project {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
-  events Event[]
+  kind               ProjectKind        @default(ONE_OFF)
+  relationshipStatus RelationshipStatus @default(ACTIVE)
+  clientId           String?
+  clientRecord       Client?            @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  quoteId            String?
+  quote              Quote?             @relation(fields: [quoteId], references: [id], onDelete: Restrict)
+  agreedTotal        Decimal?           @db.Decimal(12, 2)
+  currency           Currency?
+  paymentDueDate     DateTime?          @db.Date
+  periods            ProjectPeriod[]
+  payments           Payment[]
+  workItems          WorkItem[]
+  assignments        WorkAssignment[]
+  activityRecords    ActivityRecord[]
+  events             Event[]
 
+  @@index([clientId])
+  @@index([quoteId])
   @@map("projects")
 }
 
@@ -305,21 +356,117 @@ model Project {
 /// Reutiliza Client y Project por id (ambos opcionales) en vez de duplicar
 /// esos datos.
 model Event {
-  id        String    @id @default(uuid())
+  id        String         @id @default(uuid())
   userId    String
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   title     String
-  type      EventType @default(MEETING)
+  type      EventType      @default(MEETING)
   startAt   DateTime
   endAt     DateTime
   location  String?
-  notes     String?   @db.Text
+  notes     String?        @db.Text
   clientId  String?
-  client    Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  client    Client?        @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  periodId  String?
+  period    ProjectPeriod? @relation(fields: [periodId], references: [id], onDelete: Restrict)
   projectId String?
-  project   Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  project   Project?       @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
 
   @@map("events")
+}
+
+model ProjectPeriod {
+  id              String           @id @default(uuid())
+  projectId       String
+  project         Project          @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  label           String
+  startDate       DateTime         @db.Date
+  dueDate         DateTime?        @db.Date
+  status          ProjectStatus    @default(NOT_STARTED)
+  agreedTotal     Decimal?         @db.Decimal(12, 2)
+  currency        Currency?
+  paymentDueDate  DateTime?        @db.Date
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  payments        Payment[]
+  workItems       WorkItem[]
+  assignments     WorkAssignment[]
+  activityRecords ActivityRecord[]
+  events          Event[]
+
+  @@unique([projectId, startDate])
+  @@unique([id, projectId])
+  @@map("project_periods")
+}
+
+model Payment {
+  id           String         @id @default(uuid())
+  requestId    String         @unique
+  projectId    String
+  project      Project        @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  periodId     String?
+  period       ProjectPeriod? @relation(fields: [periodId], references: [id], onDelete: Restrict)
+  amount       Decimal        @db.Decimal(12, 2)
+  currency     Currency
+  paidAt       DateTime       @db.Date
+  note         String?
+  recordedById String
+  recordedBy   User           @relation(fields: [recordedById], references: [id], onDelete: Restrict)
+  createdAt    DateTime       @default(now())
+
+  @@index([projectId, periodId])
+  @@map("payments")
+}
+
+model WorkItem {
+  id          String         @id @default(uuid())
+  projectId   String
+  project     Project        @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  periodId    String?
+  period      ProjectPeriod? @relation(fields: [periodId], references: [id], onDelete: Restrict)
+  title       String
+  kind        WorkItemKind   @default(TASK)
+  priority    WorkPriority   @default(NORMAL)
+  dueDate     DateTime?      @db.Date
+  recurring   Boolean        @default(false)
+  completedAt DateTime?
+  createdAt   DateTime       @default(now())
+
+  @@index([projectId, periodId])
+  @@map("work_items")
+}
+
+model WorkAssignment {
+  id        String         @id @default(uuid())
+  projectId String
+  project   Project        @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  periodId  String?
+  period    ProjectPeriod? @relation(fields: [periodId], references: [id], onDelete: Restrict)
+  userId    String
+  user      User           @relation(fields: [userId], references: [id], onDelete: Restrict)
+  createdAt DateTime       @default(now())
+
+  @@unique([projectId, periodId, userId])
+  @@map("work_assignments")
+}
+
+model ActivityRecord {
+  id          String         @id @default(uuid())
+  actorId     String
+  actor       User           @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  projectId   String?
+  project     Project?       @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  periodId    String?
+  period      ProjectPeriod? @relation(fields: [periodId], references: [id], onDelete: Restrict)
+  clientId    String?
+  client      Client?        @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  action      String
+  description String
+  createdAt   DateTime       @default(now())
+
+  @@index([projectId, periodId, createdAt])
+  @@index([clientId, createdAt])
+  @@map("activity_records")
 }

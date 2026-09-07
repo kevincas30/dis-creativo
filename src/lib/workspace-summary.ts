@@ -5,7 +5,7 @@ export function projectAttention(
   project: { status: ProjectStatus; dueDate: Date | null },
   today: string,
 ): string | null {
-  if (project.status === "DONE") return null;
+  if (["DONE", "DELIVERED", "CLOSED", "PAUSED", "CANCELLED"].includes(project.status)) return null;
   const dueDay = project.dueDate?.toISOString().slice(0, 10);
   if (dueDay && dueDay < today) return "Entrega vencida";
   if (dueDay === today) return "Entrega hoy";
@@ -17,7 +17,7 @@ export function prioritizeProjects<T extends { status: ProjectStatus; dueDate: D
   projects: T[],
   today: string,
 ): T[] {
-  return projects.filter((project) => project.status !== "DONE").sort((a, b) => {
+  return projects.filter((project) => !["DONE", "CLOSED", "CANCELLED"].includes(project.status)).sort((a, b) => {
     const attention = Number(Boolean(projectAttention(b, today))) - Number(Boolean(projectAttention(a, today)));
     if (attention) return attention;
     const deadline = (a.dueDate?.getTime() ?? Infinity) - (b.dueDate?.getTime() ?? Infinity);

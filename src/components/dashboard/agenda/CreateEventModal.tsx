@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { CalendarPlus } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import Button from "@/components/ui/Button";
@@ -30,6 +30,8 @@ export default function CreateEventModal({
   projects,
   defaultDate,
   defaultClientId,
+  defaultProjectId,
+  defaultPeriodId,
   onCreated,
 }: {
   isOpen: boolean;
@@ -38,21 +40,29 @@ export default function CreateEventModal({
   projects: { id: string; name: string }[];
   defaultDate?: string;
   defaultClientId?: string;
+  defaultProjectId?: string;
+  defaultPeriodId?: string;
   onCreated: (event: EventSnapshot) => void;
 }) {
+  const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   function handleSubmit(formData: FormData) {
     startTransition(async () => {
+      try {
+      if (defaultProjectId) formData.set("projectId", defaultProjectId);
+      if (defaultPeriodId) formData.set("periodId", defaultPeriodId);
       const created = await createEvent(formData);
       onCreated(created);
       onClose();
+      } catch (error) { setError(error instanceof Error ? error.message : "No se pudo crear el evento."); }
     });
   }
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} className="max-w-lg">
       <form action={handleSubmit}>
+        {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
         <div className="flex items-start gap-3">
           <div className="bg-accent-soft flex h-10 w-10 shrink-0 items-center justify-center rounded-xl">
             <CalendarPlus className="text-foreground h-5 w-5" strokeWidth={1.75} />
@@ -91,7 +101,7 @@ export default function CreateEventModal({
             </Field>
 
             <Field label="Proyecto (opcional)" htmlFor="projectId">
-              <select id="projectId" name="projectId" defaultValue="" className={inputClassName}>
+              <select id="projectId" name="projectId" defaultValue={defaultProjectId ?? ""} disabled={!!defaultProjectId} className={inputClassName}>
                 <option value="">Sin proyecto</option>
                 {projects.map((project) => (
                   <option key={project.id} value={project.id}>

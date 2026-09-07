@@ -5,9 +5,9 @@ import type { ProjectSnapshot } from "@/lib/project-presenter";
 export default function ProjectsBoard({ projects }: { projects: ProjectSnapshot[] }) {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      {PROJECT_STATUS_ORDER.map((status) => {
+      {PROJECT_STATUS_ORDER.filter((status) => projects.some((p) => p.kind !== "RECURRING" && p.status === status)).map((status) => {
         const config = PROJECT_STATUS_CONFIG[status];
-        const columnProjects = projects.filter((project) => project.status === status);
+        const columnProjects = projects.filter((project) => project.kind !== "RECURRING" && project.status === status);
 
         return (
           <div key={status} className="flex flex-col gap-3">
@@ -29,6 +29,7 @@ export default function ProjectsBoard({ projects }: { projects: ProjectSnapshot[
           </div>
         );
       })}
+      {projects.some((p) => p.kind === "RECURRING") && <div className="flex flex-col gap-3"><h3 className="text-xs text-muted-foreground uppercase">Relaciones recurrentes</h3>{projects.filter((p) => p.kind === "RECURRING").map((p) => <ProjectCard key={p.id} project={p} />)}</div>}
     </div>
   );
 }

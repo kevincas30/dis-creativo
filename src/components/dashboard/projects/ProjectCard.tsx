@@ -14,7 +14,7 @@ export default function ProjectCard({ project }: { project: ProjectSnapshot }) {
 
   return (
     <Link
-      href={`/projects/${project.id}`}
+      href={`/projects/${project.id}${project.currentPeriod ? `?period=${project.currentPeriod.id}` : ""}`}
       className="liquid-glass focus-visible:ring-accent/40 group flex cursor-pointer flex-col gap-3 rounded-2xl p-4 transition-all duration-200 ease-out hover:-translate-y-px focus-visible:ring-2 focus-visible:outline-none"
       style={{ "--liquid-glass-border": "rgba(166, 217, 226, 0.18)" } as React.CSSProperties}
     >
@@ -27,7 +27,7 @@ export default function ProjectCard({ project }: { project: ProjectSnapshot }) {
           className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${config.badgeClassName}`}
         >
           <span className={`h-1.5 w-1.5 rounded-full ${config.dot}`} />
-          {config.label}
+          {project.kind === "RECURRING" ? ({ ACTIVE: "Activo", PAUSED: "Pausado", CLOSED: "Cerrado", CANCELLED: "Cancelado" }[project.relationshipStatus]) : config.label}
         </span>
       </div>
 
@@ -36,12 +36,17 @@ export default function ProjectCard({ project }: { project: ProjectSnapshot }) {
           <div className="bg-accent h-full rounded-full transition-all duration-300" style={{ width: `${project.progress}%` }} />
         </div>
         <p className="text-muted-foreground mt-1 text-[11px]">{project.progress}%</p>
+        {project.kind === "RECURRING" && project.currentPeriod ? (
+          <p className="text-muted-foreground mt-2 text-xs">
+            {project.currentPeriod.label} · {PROJECT_STATUS_CONFIG[project.currentPeriod.status].label}
+          </p>
+        ) : null}
       </div>
 
       <div className="flex items-center justify-between gap-2">
         <span className="text-muted-foreground flex items-center gap-1.5 text-xs">
           <CalendarDays className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
-          {formatDueDate(project.dueDate)}
+          {project.kind === "RECURRING" ? formatDueDate(project.currentPeriod?.dueDate ?? null) : formatDueDate(project.dueDate)}
         </span>
         <Avatar name={project.owner ?? "?"} className="h-6 w-6 text-[10px]" />
       </div>

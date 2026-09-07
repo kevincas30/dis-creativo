@@ -1,3 +1,11 @@
+import Link from "next/link";
+import ArchiveClientButton from "@/components/dashboard/clientes/ArchiveClientButton";
+import PaymentAccounts from "@/components/dashboard/PaymentAccounts";
+import WorkList from "@/components/dashboard/WorkList";
+import { getPaymentAccounts } from "@/lib/payment-accounts";
+import { financialSummary } from "@/lib/work-finance";
+import { toDateInputValue } from "@/lib/dashboard-agenda-dates";
+import { isActiveProject } from "@/lib/project-status";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/current-user";
@@ -43,11 +51,11 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
       },
     }),
     prisma.project.findMany({ where: { userId: user.id }, orderBy: { updatedAt: "desc" } }),
-    prisma.client.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    prisma.client.findMany({ where: { archivedAt: null }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
   ]);
 
   const serializedClient = serializeClient(client);
-  const matchedProjects = userProjects.filter((project) => projectMatchesClient(project.client, serializedClient)).map(serializeProject);
+  const matchedProjects = userProjects.filter((project) => project.clientId === id).map(serializeProject);
   const serializedEvents = events.map(serializeEvent);
   const quoteRows = quotes.map((quote) => ({
     id: quote.id,
@@ -57,38 +65,21 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
     issuedAt: quote.issuedAt.toISOString(),
   }));
 
+  const [accounts, records, workItems, periods] = await Promise.all([
+    getPaymentAccounts(user.id, id),
+    prisma.activityRecord.findMany({ where: { clientId: id, OR: [{ actorId: user.id }, { project: { userId: user.id } }] }, include: { actor: { select: { displayName: true } } }, orderBy: { createdAt: "desc" }, take: 30 }),
+    prisma.workItem.findMany({ where: { project: { clientId: id, userId: user.id }, completedAt: null }, include: { project: { select: { name: true } }, period: { select: { label: true } } }, orderBy: { dueDate: "asc" } }),
+    prisma.projectPeriod.findMany({ where: { project: { clientId: id, userId: user.id } }, include: { project: { select: { name: true } } }, orderBy: { startDate: "desc" } }),
+  ]);
+  const legacyProjects = userProjects.filter((p) => !p.clientId && projectMatchesClient(p.client, serializedClient));
   const summary: ClientSummary = {
-    activeProjects: matchedProjects.filter((project) => project.status !== "DONE").length,
-    sentQuotes: quoteRows.length,
+    activeProjects: matchedProjects.filter(isActiveProject).length,
+    sentQuotes: quoteRows.filter((quote) => !["DRAFT", "ARCHIVED"].includes(quote.status)).length,
     registeredMeetings: serializedEvents.filter((event) => event.type === "MEETING").length,
-    pendingPayments: null,
+    pendingPayments: accounts.filter((account) => account.total !== null && financialSummary(account.total, account.payments.map((payment) => payment.amount), account.dueDate, toDateInputValue(new Date())).status !== "Pagado").length,
   };
 
-  const activity: ClientActivityItem[] = [
-    ...quoteRows.map((quote) => ({
-      id: `quote-${quote.id}`,
-      type: "quote" as const,
-      label: "Presupuesto actualizado",
-      subject: new Intl.NumberFormat("es-MX", { style: "currency", currency: quote.currency ?? "MXN" }).format(quote.total),
-      when: quote.issuedAt,
-    })),
-    ...matchedProjects.map((project) => ({
-      id: `project-${project.id}`,
-      type: "project" as const,
-      label: "Proyecto actualizado",
-      subject: project.name,
-      when: project.updatedAt,
-    })),
-    ...serializedEvents.map((event) => ({
-      id: `event-${event.id}`,
-      type: "event" as const,
-      label: "Evento agendado",
-      subject: event.title,
-      when: event.startAt,
-    })),
-  ]
-    .sort((a, b) => new Date(b.when).getTime() - new Date(a.when).getTime())
-    .slice(0, 12);
+  const activity: ClientActivityItem[] = records.map((record) => ({ id: record.id, type: "project", label: record.description, subject: record.actor.displayName, when: record.createdAt.toISOString() }));
 
   return (
     <div className="relative flex h-full flex-col overflow-y-auto px-6 py-10 sm:px-10 lg:px-16">
@@ -96,7 +87,9 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
 
       <div className="mx-auto w-full max-w-5xl pb-12">
         <ClientDetailClient
+          key={client.updatedAt.toISOString()}
           client={serializedClient}
+          paymentsContent={<PaymentAccounts accounts={accounts} />}
           summary={summary}
           projects={matchedProjects}
           quotes={quoteRows}
@@ -105,6 +98,12 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
           allClients={allClients}
           allProjects={userProjects.map((project) => ({ id: project.id, name: project.name }))}
         />
+        {user.role === "ADMIN" && <ArchiveClientButton id={id} archived={!!client.archivedAt} />}
+        <section className="mt-6 space-y-4 liquid-glass rounded-2xl p-5"><h2 className="font-semibold">Periodos y trabajo pendiente</h2>
+          {periods.map((p) => <Link className="block text-sm underline" key={p.id} href={`/projects/${p.projectId}?period=${p.id}`}>{p.project.name} · {p.label}</Link>)}
+          <WorkList items={workItems.map((w) => ({ ...w, dueDate: w.dueDate?.toISOString() ?? null, completedAt: w.completedAt?.toISOString() ?? null }))} />
+        </section>
+        {!!legacyProjects.length && <section className="mt-6 text-sm space-y-2"><h2 className="font-medium">Coincidencias antiguas por nombre · vínculo sin confirmar</h2><p className="text-muted-foreground">Confirma el cliente desde cada proyecto para incorporar su trabajo y pagos a esta ficha.</p>{legacyProjects.map((p) => <Link className="block underline" key={p.id} href={`/projects/${p.id}`}>{p.name}</Link>)}</section>}
       </div>
     </div>
   );

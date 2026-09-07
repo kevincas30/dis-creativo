@@ -51,10 +51,21 @@ export async function createEvent(formData: FormData) {
     throw new Error("Fecha u hora inválida.");
   }
 
-  const clientId = readText(formData, "clientId");
+  let clientId = readText(formData, "clientId");
   const projectId = readText(formData, "projectId");
 
-  const event = await prisma.event.create({
+  const periodId = readText(formData, "periodId");
+  if (endAt <= startAt) throw new Error("La hora final debe ser posterior al inicio.");
+  const project = projectId ? await prisma.project.findFirst({ where: { id: projectId, userId: user.id } }) : null;
+  if (projectId && !project) throw new Error("Proyecto no disponible.");
+  if (project?.clientId) {
+    if (clientId && clientId !== project.clientId) throw new Error("El cliente no corresponde al proyecto.");
+    clientId = project.clientId;
+  }
+  if (clientId && !await prisma.client.findFirst({ where: { id: clientId, archivedAt: null } })) throw new Error("Cliente no disponible.");
+  if (periodId && (!project || !await prisma.projectPeriod.findFirst({ where: { id: periodId, projectId: project.id } }))) throw new Error("Periodo no válido para este proyecto.");
+  const event = await prisma.$transaction(async (tx) => {
+  const created = await tx.event.create({
     data: {
       userId: user.id,
       title,
@@ -65,11 +76,15 @@ export async function createEvent(formData: FormData) {
       notes: readText(formData, "notes"),
       clientId,
       projectId,
+      periodId,
     },
     select: EVENT_SELECT,
   });
+  await tx.activityRecord.create({ data: { actorId: user.id, clientId, projectId, periodId, action: "EVENT_CREATED", description: `Evento agendado: ${title}` } });
+  return created;
+  });
 
-  revalidatePath("/");
+  revalidatePath("/", "layout");
   revalidatePath("/agenda");
 
   return serializeEvent(event);

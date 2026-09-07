@@ -1,16 +1,18 @@
 import Link from "next/link";
-import { ArrowUpRight, CalendarDays, FolderKanban, ListChecks } from "lucide-react";
+import { ArrowUpRight, CalendarDays, FolderKanban } from "lucide-react";
 import { getCurrentUser } from "@/lib/current-user";
 import { firstNameOf } from "@/lib/names";
 import { prisma } from "@/lib/prisma";
-import { getRecentActivity } from "@/lib/activity";
+import RecordedActivity from "@/components/dashboard/RecordedActivity";
+import WorkList from "@/components/dashboard/WorkList";
+import { isActiveProject } from "@/lib/project-status";
 import { addDays, startOfDay, toDateInputValue, formatDayLabel, formatTime } from "@/lib/dashboard-agenda-dates";
 import { PROJECT_STATUS_CONFIG } from "@/lib/project-status";
 import { EVENT_TYPE_CONFIG } from "@/lib/event-type";
 import { prioritizeProjects, projectAttention } from "@/lib/workspace-summary";
 import DashboardBackground from "@/components/dashboard/DashboardBackground";
 import WorkspaceActions from "@/components/dashboard/WorkspaceActions";
-import RecentActivityCard from "@/components/home/RecentActivityCard";
+
 
 function greetingFor(hour: number) {
   if (hour >= 5 && hour < 12) return "Buenos días";
@@ -26,7 +28,7 @@ export default async function DashboardHome() {
   const today = startOfDay(now);
   const tomorrow = addDays(today, 1);
   const todayKey = toDateInputValue(today);
-  const [events, projects, activity] = await Promise.all([
+  const [events, projects, activity, tasks] = await Promise.all([
     prisma.event.findMany({
       where: { userId: user.id, startAt: { lt: tomorrow }, endAt: { gt: today } },
       orderBy: { startAt: "asc" },
@@ -37,12 +39,18 @@ export default async function DashboardHome() {
       },
     }),
     prisma.project.findMany({
-      where: { userId: user.id, status: { not: "DONE" } },
-      select: { id: true, name: true, client: true, type: true, status: true, dueDate: true, updatedAt: true },
+      where: { userId: user.id },
+      include: { periods: { orderBy: { startDate: "desc" } } },
     }),
-    getRecentActivity(user.id, 4),
+    prisma.activityRecord.findMany({ where: { OR: [{ actorId: user.id }, { project: { userId: user.id } }] }, include: { actor: { select: { displayName: true } } }, orderBy: { createdAt: "desc" }, take: 6 }),
+    prisma.workItem.findMany({ where: { project: { userId: user.id }, completedAt: null, kind: "TASK", dueDate: { lt: new Date(toDateInputValue(tomorrow) + "T00:00:00Z") } }, include: { project: { select: { name: true } }, period: { select: { label: true } } }, orderBy: { dueDate: "asc" } }),
   ]);
-  const orderedProjects = prioritizeProjects(projects, todayKey);
+  const operationalProjects = projects.filter(isActiveProject).map((p) => {
+    if (p.kind !== "RECURRING") return p;
+    const period = p.periods.find((c) => !["CLOSED", "CANCELLED", "DONE"].includes(c.status) && c.startDate.toISOString().slice(0, 10) <= todayKey) ?? p.periods.find((c) => !["CLOSED", "CANCELLED", "DONE"].includes(c.status));
+    return { ...p, currentPeriodId: period?.id ?? null, name: `${p.name}${period ? ` · ${period.label}` : " · Sin periodo activo"}`, status: p.relationshipStatus === "PAUSED" ? "PAUSED" as const : period?.status ?? "NOT_STARTED" as const, dueDate: period?.dueDate ?? null };
+  });
+  const orderedProjects = prioritizeProjects(operationalProjects, todayKey);
   const attentionCount = orderedProjects.filter((project) => projectAttention(project, todayKey)).length;
 
   return (
@@ -56,7 +64,7 @@ export default async function DashboardHome() {
               {greetingFor(now.getHours())}, {firstNameOf(user.displayName)}
             </h1>
             <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
-              {events.length === 0 ? "Sin compromisos en agenda para hoy" : `${events.length} ${events.length === 1 ? "compromiso" : "compromisos"} para hoy`}
+              {tasks.length} tareas pendientes para hoy · {events.length === 0 ? "Sin compromisos en agenda para hoy" : `${events.length} ${events.length === 1 ? "compromiso" : "compromisos"} para hoy`}
               {" · "}
               {attentionCount === 0 ? "Sin proyectos con revisión o entrega pendiente" : `${attentionCount} ${attentionCount === 1 ? "proyecto necesita" : "proyectos necesitan"} atención`}
             </p>
@@ -101,13 +109,7 @@ export default async function DashboardHome() {
                 })}
               </ul>
             )}
-            <div className="border-surface-border mt-4 flex gap-3 border-t pt-4">
-              <ListChecks className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-              <div>
-                <p className="text-sm font-medium">Tareas por proyecto</p>
-                <p className="text-muted-foreground mt-1 text-xs leading-relaxed">El módulo de tareas aún no está disponible. Por ahora, consulta los compromisos y el estado de cada proyecto.</p>
-              </div>
-            </div>
+            <div className="border-surface-border mt-4 border-t pt-4"><Link href="/tasks" className={TEXT_LINK}>Tareas de hoy y atrasadas</Link><WorkList items={tasks.map((w) => ({ ...w, dueDate: w.dueDate?.toISOString() ?? null, completedAt: w.completedAt?.toISOString() ?? null }))} /></div>
           </section>
 
           <section aria-labelledby="projects-heading" className="liquid-glass animate-fade-in-up min-w-0 rounded-2xl p-5 sm:p-6">
@@ -131,7 +133,7 @@ export default async function DashboardHome() {
                   const attention = projectAttention(project, todayKey);
                   return (
                     <li key={project.id}>
-                      <Link href={`/projects/${project.id}`} className="hover:bg-foreground/5 focus-visible:ring-accent/40 -mx-2 block rounded-xl px-2 py-3.5 transition-colors focus-visible:outline-none focus-visible:ring-2">
+                      <Link href={`/projects/${project.id}${"currentPeriodId" in project && project.currentPeriodId ? `?period=${project.currentPeriodId}` : ""}`} className="hover:bg-foreground/5 focus-visible:ring-accent/40 -mx-2 block rounded-xl px-2 py-3.5 transition-colors focus-visible:outline-none focus-visible:ring-2">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <p className="min-w-0 break-words text-sm font-medium">{project.name}</p>
                           <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] ${status.badgeClassName}`}>{status.label}</span>
@@ -148,8 +150,8 @@ export default async function DashboardHome() {
           </section>
         </div>
 
-        <section aria-label="Actividad reciente de presupuestos" className="max-w-2xl">
-          <RecentActivityCard events={activity} />
+        <section aria-label="Actividad reciente" className="max-w-2xl">
+          <RecordedActivity events={activity} />
         </section>
       </div>
     </div>

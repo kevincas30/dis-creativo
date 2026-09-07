@@ -31,14 +31,21 @@ Muy bien ${name}, envíame la siguiente información para preparar la propuesta 
 Con esa información podré preparar el presupuesto rápidamente. 🚀`;
 }
 
-export async function createDraftQuote() {
+export async function createDraftQuote() { return makeDraftQuote(); }
+
+export async function createDraftQuoteForClient(clientId: string) { return makeDraftQuote(clientId); }
+
+async function makeDraftQuote(clientId?: string) {
   const user = await getCurrentUser();
+  if (clientId && !await prisma.client.findFirst({ where: { id: clientId, archivedAt: null } })) throw new Error("Cliente no disponible.");
   const greetingAt = new Date();
   const intakeAt = new Date(greetingAt.getTime() + 1);
 
-  const quote = await prisma.quote.create({
+  const quote = await prisma.$transaction(async (tx) => {
+  const created = await tx.quote.create({
     data: {
       userId: user.id,
+      clientId,
       messages: {
         create: [
           { role: "user", content: GREETING_MESSAGE, createdAt: greetingAt },
@@ -46,6 +53,9 @@ export async function createDraftQuote() {
         ],
       },
     },
+  });
+  await tx.activityRecord.create({ data: { actorId: user.id, clientId, action: "QUOTE_CREATED", description: `Presupuesto creado: ${created.id.slice(0, 8)}` } });
+  return created;
   });
   revalidatePath("/", "layout");
   redirect(`/presupuestos/quotes/${quote.id}?new=1`);
@@ -131,9 +141,12 @@ export async function updateQuoteStatus(quoteId: string, status: QuoteStatus) {
     ...(status === "PAID" && !quote.paidAt ? { paidAt: new Date() } : {}),
   };
 
-  await prisma.quote.update({
-    where: { id: quoteId },
-    data: { status, ...timestamps, statusHistory: { create: { status } } },
+  if (status === quote.status) return;
+  const labels: Record<QuoteStatus, string> = { DRAFT: "Borrador", SENT: "Enviado", ACCEPTED: "Aprobado", REJECTED: "Rechazado", ARCHIVED: "Archivado", PAID: "Marcado pagado en presupuesto (sin registrar cobro)" };
+  if (!Object.hasOwn(labels, status)) throw new Error("Estado no válido.");
+  await prisma.$transaction(async (tx) => {
+    await tx.quote.update({ where: { id: quoteId }, data: { status, ...timestamps, statusHistory: { create: { status } } } });
+    await tx.activityRecord.create({ data: { actorId: user.id, clientId: quote.clientId, action: "QUOTE_STATUS_CHANGED", description: `Presupuesto ${quoteId.slice(0, 8)}: ${labels[status]}` } });
   });
 
   revalidatePath("/", "layout");

@@ -6,7 +6,7 @@ import { ArrowLeft, Mail, Phone, MapPin, Globe, Pencil, X, Plus, FolderPlus, Cal
 import Button from "@/components/ui/Button";
 import { CLIENT_STATUS_CONFIG } from "@/lib/client-status";
 import { updateClient } from "@/app/(dashboard)/clientes/actions";
-import { createDraftQuote } from "@/app/presupuestos/quotes/actions";
+import { createDraftQuoteForClient } from "@/app/presupuestos/quotes/actions";
 import ClientFormFields from "@/components/dashboard/clientes/ClientFormFields";
 import ClientSummaryTiles, { type ClientSummary } from "@/components/dashboard/clientes/ClientSummaryTiles";
 import ClientTabs, { type ClientTabId } from "@/components/dashboard/clientes/ClientTabs";
@@ -32,7 +32,9 @@ export default function ClientDetailClient({
   activity,
   allClients,
   allProjects,
+  paymentsContent,
 }: {
+  paymentsContent?: React.ReactNode;
   client: ClientSnapshot;
   summary: ClientSummary;
   projects: ProjectSnapshot[];
@@ -155,7 +157,7 @@ export default function ClientDetailClient({
                 <FolderPlus className="h-4 w-4" strokeWidth={1.75} />
                 Nuevo proyecto
               </Button>
-              <form action={createDraftQuote}>
+              <form action={createDraftQuoteForClient.bind(null, client.id)}>
                 <Button type="submit" variant="secondary">
                   <Plus className="h-4 w-4" strokeWidth={1.75} />
                   Nuevo presupuesto
@@ -179,12 +181,12 @@ export default function ClientDetailClient({
         {activeTab === "projects" ? <ClientProjectsTab projects={projects} /> : null}
         {activeTab === "quotes" ? <ClientQuotesTab quotes={quotes} /> : null}
         {activeTab === "agenda" ? <ClientAgendaTab events={events} /> : null}
-        {activeTab === "payments" ? <ClientPaymentsTab /> : null}
+        {activeTab === "payments" ? paymentsContent ?? <ClientPaymentsTab /> : null}
         {activeTab === "documents" ? <ClientDocumentsTab /> : null}
         {activeTab === "activity" ? <ClientActivityTab items={activity} /> : null}
       </div>
 
-      <CreateProjectModal isOpen={isProjectModalOpen} onClose={() => setIsProjectModalOpen(false)} defaultClient={client.displayName} />
+      <CreateProjectModal isOpen={isProjectModalOpen} onClose={() => setIsProjectModalOpen(false)} defaultClient={client.displayName} defaultClientId={client.id} />
       <CreateEventModal
         isOpen={isEventModalOpen}
         onClose={() => setIsEventModalOpen(false)}
