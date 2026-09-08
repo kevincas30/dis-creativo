@@ -34,6 +34,13 @@ enum UserRole {
   MEMBER
 }
 
+/// Rol de una persona dentro de un workspace compartido. Sustituirá de forma
+/// gradual a User.role como fuente de autorización durante la Fase 0.
+enum WorkspaceRole {
+  ADMIN
+  MEMBER
+}
+
 enum ProjectStatus {
   NOT_STARTED
   IN_PROGRESS
@@ -99,8 +106,47 @@ model User {
   assignments      WorkAssignment[]
   recordedPayments Payment[]
   activityRecords  ActivityRecord[]
+  workspaceMembers WorkspaceMember[]
 
   @@map("users")
+}
+
+/// Espacio compartido del estudio. La primera migración lo mantiene aislado de
+/// los datos históricos: las entidades existentes tendrán workspaceId opcional
+/// hasta completar el backfill de la Fase 0B.
+model Workspace {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members         WorkspaceMember[]
+  clients         Client[]
+  services        Service[]
+  quotes          Quote[]
+  projects        Project[]
+  workItems       WorkItem[]
+  events          Event[]
+  activityRecords ActivityRecord[]
+
+  @@map("workspaces")
+}
+
+/// Membresía y rol de un usuario dentro de un workspace. No hay selección de
+/// workspace todavía: los helpers exigen una única membresía activa por usuario.
+model WorkspaceMember {
+  id          String        @id @default(uuid())
+  workspaceId String
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  role        WorkspaceRole @default(MEMBER)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+  @@map("workspace_members")
 }
 
 /// Cliente del estudio — compartido por Presupuestos IA (que solo lee/escribe
@@ -111,6 +157,8 @@ model User {
 /// romper Presupuestos IA, que depende de él en PDFs, chat y actividad.
 model Client {
   id              String       @id @default(uuid())
+  workspaceId     String?
+  workspace       Workspace?   @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
   name            String
   firstName       String?
   lastName        String?
@@ -134,27 +182,31 @@ model Client {
 
   @@index([name])
   @@index([company])
+  @@index([workspaceId])
   @@map("clients")
 }
 
 /// Servicio del catálogo (webs, diseño de redes, fotografía, etc.).
 /// Editable por el usuario desde la app, sin intervención de desarrollo.
 model Service {
-  id          String   @id @default(uuid())
+  id          String     @id @default(uuid())
+  workspaceId String?
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
   /// Identificador estable para servicios del catálogo oficial (p. ej. "SOCIAL_POST"),
   /// usado por el motor de precios para no depender de coincidencias de texto.
-  code        String?  @unique
+  code        String?    @unique
   name        String
   category    String
   description String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 
   pricingRules   PricingRule[]
   discountRules  DiscountRule[]
   quoteLineItems QuoteLineItem[]
 
+  @@index([workspaceId])
   @@map("services")
 }
 
@@ -193,11 +245,13 @@ model PricingRule {
 /// completando incrementalmente; guarda el resultado final, la explicación del
 /// cálculo y el copy de venta que se incluyen en el PDF (PRD 4, 8 y 10).
 model Quote {
-  id       String  @id @default(uuid())
-  userId   String
-  user     User    @relation(fields: [userId], references: [id])
-  clientId String?
-  client   Client? @relation(fields: [clientId], references: [id])
+  id          String     @id @default(uuid())
+  workspaceId String?
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  userId      String
+  user        User       @relation(fields: [userId], references: [id])
+  clientId    String?
+  client      Client?    @relation(fields: [clientId], references: [id])
 
   /// Nulos hasta que la IA los determina vía set_client (a partir del país).
   currency       Currency?
@@ -246,6 +300,7 @@ model Quote {
   messages      ConversationMessage[]
   notes         QuoteNote[]
 
+  @@index([workspaceId])
   @@map("quotes")
 }
 
@@ -317,6 +372,8 @@ model QuoteStatusHistory {
 /// ni Equipo (ambos siguen siendo placeholders "Próximamente").
 model Project {
   id          String        @id @default(uuid())
+  workspaceId String?
+  workspace   Workspace?    @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
   userId      String
   user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   name        String
@@ -348,6 +405,7 @@ model Project {
 
   @@index([clientId])
   @@index([quoteId])
+  @@index([workspaceId])
   @@map("projects")
 }
 
@@ -356,24 +414,27 @@ model Project {
 /// Reutiliza Client y Project por id (ambos opcionales) en vez de duplicar
 /// esos datos.
 model Event {
-  id        String         @id @default(uuid())
-  userId    String
-  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title     String
-  type      EventType      @default(MEETING)
-  startAt   DateTime
-  endAt     DateTime
-  location  String?
-  notes     String?        @db.Text
-  clientId  String?
-  client    Client?        @relation(fields: [clientId], references: [id], onDelete: SetNull)
-  periodId  String?
-  period    ProjectPeriod? @relation(fields: [periodId], references: [id], onDelete: Restrict)
-  projectId String?
-  project   Project?       @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
+  id          String         @id @default(uuid())
+  workspaceId String?
+  workspace   Workspace?     @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  userId      String
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  type        EventType      @default(MEETING)
+  startAt     DateTime
+  endAt       DateTime
+  location    String?
+  notes       String?        @db.Text
+  clientId    String?
+  client      Client?        @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  periodId    String?
+  period      ProjectPeriod? @relation(fields: [periodId], references: [id], onDelete: Restrict)
+  projectId   String?
+  project     Project?       @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
 
+  @@index([workspaceId])
   @@map("events")
 }
 
@@ -422,6 +483,8 @@ model Payment {
 
 model WorkItem {
   id          String         @id @default(uuid())
+  workspaceId String?
+  workspace   Workspace?     @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
   projectId   String
   project     Project        @relation(fields: [projectId], references: [id], onDelete: Restrict)
   periodId    String?
@@ -435,6 +498,7 @@ model WorkItem {
   createdAt   DateTime       @default(now())
 
   @@index([projectId, periodId])
+  @@index([workspaceId])
   @@map("work_items")
 }
 
@@ -454,6 +518,8 @@ model WorkAssignment {
 
 model ActivityRecord {
   id          String         @id @default(uuid())
+  workspaceId String?
+  workspace   Workspace?     @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
   actorId     String
   actor       User           @relation(fields: [actorId], references: [id], onDelete: Restrict)
   projectId   String?
@@ -468,5 +534,6 @@ model ActivityRecord {
 
   @@index([projectId, periodId, createdAt])
   @@index([clientId, createdAt])
+  @@index([workspaceId])
   @@map("activity_records")
 }

@@ -6,6 +6,8 @@
     "dev": "next dev",
     "build": "prisma generate && next build",
     "test:integration": "tsx tests/project-work.integration.ts",
+    "test:workspace": "tsx --test src/lib/workspace-access.test.ts src/lib/workspace-bootstrap.test.ts",
+    "bootstrap:workspace": "tsx scripts/bootstrap-workspace.ts",
     "start": "next start",
     "lint": "eslint"
   },
