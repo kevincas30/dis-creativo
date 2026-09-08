@@ -1,12 +1,12 @@
 import type { ReactNode } from "react";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/current-user";
+import { requireWorkspaceMembership } from "@/lib/workspace-access";
 import Sidebar from "@/components/sidebar/Sidebar";
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
-  const user = await getCurrentUser();
+  const { user, workspace } = await requireWorkspaceMembership();
   const quotes = await prisma.quote.findMany({
-    where: { userId: user.id },
+    where: { workspaceId: workspace.id },
     include: { client: true },
     orderBy: { updatedAt: "desc" },
   });

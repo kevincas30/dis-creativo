@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/current-user";
+import { requireWorkspaceMembership } from "@/lib/workspace-access";
 import { serializeQuote } from "@/lib/quote-presenter";
 import QuoteWorkspace from "@/components/quotes/QuoteWorkspace";
 
@@ -13,10 +13,10 @@ export default async function QuotePage({
 }) {
   const { id } = await params;
   const { new: isNewParam } = await searchParams;
-  const user = await getCurrentUser();
+  const { workspace } = await requireWorkspaceMembership();
 
-  const quote = await prisma.quote.findUnique({
-    where: { id },
+  const quote = await prisma.quote.findFirst({
+    where: { id, workspaceId: workspace.id },
     include: {
       client: true,
       lineItems: { orderBy: { sortOrder: "asc" } },
@@ -25,7 +25,7 @@ export default async function QuotePage({
     },
   });
 
-  if (!quote || quote.userId !== user.id) {
+  if (!quote) {
     notFound();
   }
 

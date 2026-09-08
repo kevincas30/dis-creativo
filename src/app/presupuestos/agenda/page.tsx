@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/current-user";
+import { requireWorkspaceMembership } from "@/lib/workspace-access";
 import type { QuoteStatus } from "@/generated/prisma/enums";
 import { addDays, dayKey, getMonthGridDays, getWeekDays, parseMonthParam } from "@/lib/agenda-dates";
 import CalendarToolbar from "@/components/agenda/CalendarToolbar";
@@ -25,7 +25,7 @@ export default async function AgendaPage({
   searchParams: Promise<{ month?: string; view?: string }>;
 }) {
   const { month, view: viewParam } = await searchParams;
-  const user = await getCurrentUser();
+  const { workspace } = await requireWorkspaceMembership();
 
   const monthDate = parseMonthParam(month);
   const view: View = viewParam === "week" || viewParam === "agenda" ? viewParam : "month";
@@ -44,7 +44,7 @@ export default async function AgendaPage({
     // Quotes que caen en el rango visible del calendario (fecha efectiva).
     prisma.quote.findMany({
       where: {
-        userId: user.id,
+        workspaceId: workspace.id,
         OR: [
           { followUpDate: { gte: rangeStart, lt: rangeEnd } },
           { followUpDate: null, createdAt: { gte: rangeStart, lt: rangeEnd } },
@@ -55,7 +55,7 @@ export default async function AgendaPage({
     // Quotes del mes calendario exacto (para las tarjetas resumen), sin depender de la grilla de 6 semanas.
     prisma.quote.findMany({
       where: {
-        userId: user.id,
+        workspaceId: workspace.id,
         OR: [
           { followUpDate: { gte: monthStart, lt: monthEnd } },
           { followUpDate: null, createdAt: { gte: monthStart, lt: monthEnd } },
@@ -64,13 +64,13 @@ export default async function AgendaPage({
       select: { status: true, total: true, currency: true },
     }),
     // Distribución por estado — histórico completo, no solo el mes.
-    prisma.quote.groupBy({ by: ["status"], where: { userId: user.id }, _count: { _all: true } }),
+    prisma.quote.groupBy({ by: ["status"], where: { workspaceId: workspace.id }, _count: { _all: true } }),
     // Actividad reciente: creaciones + cambios de estado, ya intercalados y ordenados.
-    getRecentActivity(user.id, 15),
+    getRecentActivity(workspace.id, 15),
     // Próximos seguimientos: requiere followUpDate fijado explícitamente.
     prisma.quote.findMany({
       where: {
-        userId: user.id,
+        workspaceId: workspace.id,
         status: { in: ["DRAFT", "SENT", "ACCEPTED"] },
         followUpDate: { gte: today },
       },

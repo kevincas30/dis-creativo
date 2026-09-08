@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/current-user";
+import { requireWorkspaceMembership } from "@/lib/workspace-access";
 import { serializeEvent } from "@/lib/event-presenter";
 import { EVENT_TYPE_ORDER } from "@/lib/event-type";
 import type { EventType } from "@/generated/prisma/enums";
@@ -35,7 +35,8 @@ const EVENT_SELECT = {
 } as const;
 
 export async function createEvent(formData: FormData) {
-  const user = await getCurrentUser();
+  const context = await requireWorkspaceMembership();
+  const { user, workspace } = context;
 
   const title = readText(formData, "title");
   const date = readText(formData, "date");
@@ -56,18 +57,19 @@ export async function createEvent(formData: FormData) {
 
   const periodId = readText(formData, "periodId");
   if (endAt <= startAt) throw new Error("La hora final debe ser posterior al inicio.");
-  const project = projectId ? await prisma.project.findFirst({ where: { id: projectId, userId: user.id } }) : null;
+  const project = projectId ? await prisma.project.findFirst({ where: { id: projectId, workspaceId: workspace.id } }) : null;
   if (projectId && !project) throw new Error("Proyecto no disponible.");
   if (project?.clientId) {
     if (clientId && clientId !== project.clientId) throw new Error("El cliente no corresponde al proyecto.");
     clientId = project.clientId;
   }
-  if (clientId && !await prisma.client.findFirst({ where: { id: clientId, archivedAt: null } })) throw new Error("Cliente no disponible.");
+  if (clientId && !await prisma.client.findFirst({ where: { id: clientId, workspaceId: workspace.id, archivedAt: null } })) throw new Error("Cliente no disponible.");
   if (periodId && (!project || !await prisma.projectPeriod.findFirst({ where: { id: periodId, projectId: project.id } }))) throw new Error("Periodo no válido para este proyecto.");
   const event = await prisma.$transaction(async (tx) => {
   const created = await tx.event.create({
     data: {
       userId: user.id,
+      workspaceId: workspace.id,
       title,
       type: readType(formData),
       startAt,
@@ -80,7 +82,7 @@ export async function createEvent(formData: FormData) {
     },
     select: EVENT_SELECT,
   });
-  await tx.activityRecord.create({ data: { actorId: user.id, clientId, projectId, periodId, action: "EVENT_CREATED", description: `Evento agendado: ${title}` } });
+  await tx.activityRecord.create({ data: { workspaceId: workspace.id, actorId: user.id, clientId, projectId, periodId, action: "EVENT_CREATED", description: `Evento agendado: ${title}` } });
   return created;
   });
 

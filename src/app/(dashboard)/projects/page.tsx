@@ -1,17 +1,17 @@
 import { isActiveProject } from "@/lib/project-status";
 import RecordedActivity from "@/components/dashboard/RecordedActivity";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/current-user";
+import { requireWorkspaceMembership } from "@/lib/workspace-access";
 import { serializeProject } from "@/lib/project-presenter";
 import DashboardBackground from "@/components/dashboard/DashboardBackground";
 import ProjectsPageClient from "@/components/dashboard/projects/ProjectsPageClient";
 import type { ProjectsStats } from "@/components/dashboard/projects/ProjectsStatsGrid";
 
 export default async function ProjectsPage() {
-  const user = await getCurrentUser();
+  const { workspace } = await requireWorkspaceMembership();
 
   const projects = await prisma.project.findMany({
-    where: { userId: user.id },
+    where: { workspaceId: workspace.id },
     orderBy: { createdAt: "desc" },
     include: { periods: { orderBy: { startDate: "desc" } } },
   });
@@ -39,7 +39,7 @@ export default async function ProjectsPage() {
         : Math.round(activeProjects.reduce((sum, project) => sum + project.progress, 0) / activeProjects.length),
   };
 
-  const activity = await prisma.activityRecord.findMany({ where: { project: { userId: user.id } }, include: { actor: { select: { displayName: true } } }, orderBy: { createdAt: "desc" }, take: 8 });
+  const activity = await prisma.activityRecord.findMany({ where: { workspaceId: workspace.id }, include: { actor: { select: { displayName: true } } }, orderBy: { createdAt: "desc" }, take: 8 });
   return (
     <div className="relative flex h-full flex-col overflow-y-auto px-6 py-10 sm:px-10 lg:px-16">
       <DashboardBackground />

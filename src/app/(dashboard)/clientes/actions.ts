@@ -1,6 +1,6 @@
 "use server";
 
-import { getCurrentUser } from "@/lib/current-user";
+import { requireWorkspaceAdmin, requireWorkspaceMembership, workspaceActor } from "@/lib/workspace-access";
 import { archiveClientRecord } from "@/lib/work-service";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
@@ -54,19 +54,21 @@ function buildClientData(formData: FormData) {
 }
 
 export async function createClient(formData: FormData) {
-  await getCurrentUser();
+  const context = await requireWorkspaceMembership();
   const data = buildClientData(formData);
 
-  const client = await prisma.client.create({ data });
+  const client = await prisma.client.create({ data: { ...data, workspaceId: context.workspace.id } });
 
   revalidatePath("/clientes");
   redirect(`/clientes/${client.id}`);
 }
 
 export async function updateClient(clientId: string, formData: FormData) {
-  await getCurrentUser();
+  const context = await requireWorkspaceMembership();
   const data = buildClientData(formData);
 
+  const existing = await prisma.client.findFirst({ where: { id: clientId, workspaceId: context.workspace.id } });
+  if (!existing) throw new Error("Cliente no disponible en el workspace actual.");
   const client = await prisma.client.update({ where: { id: clientId }, data });
 
   revalidatePath("/clientes");
@@ -77,8 +79,8 @@ export async function updateClient(clientId: string, formData: FormData) {
 
 export async function setClientArchived(clientId: string, archived: boolean) {
   try {
-    const user = await getCurrentUser();
-    await archiveClientRecord(prisma, user.id, clientId, archived);
+    const context = await requireWorkspaceAdmin();
+    await archiveClientRecord(prisma, workspaceActor(context), clientId, archived);
     revalidatePath("/", "layout");
     return { error: null };
   } catch (error) { return { error: error instanceof Error && !("code" in error) ? error.message : "No se pudo guardar el archivo del cliente." }; }

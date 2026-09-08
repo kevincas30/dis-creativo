@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import type { Content } from "@google/genai";
 import { genAI, GEMINI_MODEL } from "@/lib/gemini";
-import { getCurrentUser } from "@/lib/current-user";
+import { requireWorkspaceMembership } from "@/lib/workspace-access";
 import { prisma } from "@/lib/prisma";
 import { processBudgetRequest } from "@/lib/process-budget-request";
 
@@ -22,9 +22,14 @@ export async function POST(request: NextRequest) {
     kickoff?: boolean;
   };
 
-  const user = await getCurrentUser();
-  const quote = await prisma.quote.findUniqueOrThrow({ where: { id: quoteId } });
-  if (quote.userId !== user.id) {
+  let workspaceId: string;
+  try {
+    workspaceId = (await requireWorkspaceMembership()).workspace.id;
+  } catch {
+    return new Response("No autorizado.", { status: 403 });
+  }
+  const quote = await prisma.quote.findFirst({ where: { id: quoteId, workspaceId } });
+  if (!quote) {
     return new Response("No autorizado.", { status: 403 });
   }
 
@@ -70,12 +75,13 @@ export async function POST(request: NextRequest) {
             return;
           }
 
-          const result = await processBudgetRequest(text, quoteId);
+          const result = await processBudgetRequest(text, quoteId, workspaceId);
           send({ type: "quote_updated", quote: result.quote });
           send({ type: "text", text: result.summary });
         }
       } catch (error) {
-        send({ type: "error", message: error instanceof Error ? error.message : "Error desconocido." });
+        console.error("Error al procesar el chat de presupuesto", error);
+        send({ type: "error", message: "No se pudo procesar el mensaje. Revisa los datos e inténtalo de nuevo." });
       } finally {
         controller.close();
       }

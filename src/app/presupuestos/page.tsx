@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Plus, Calendar } from "lucide-react";
 import { createDraftQuote } from "./quotes/actions";
-import { getCurrentUser } from "@/lib/current-user";
+import { requireWorkspaceMembership } from "@/lib/workspace-access";
 import { prisma } from "@/lib/prisma";
 import { firstNameOf } from "@/lib/names";
 import QuickActionCard from "@/components/home/QuickActionCard";
@@ -33,7 +33,7 @@ function greetingFor(hour: number) {
   return "Buenas noches";
 }
 
-async function getSummaryStats(userId: string) {
+async function getSummaryStats(workspaceId: string) {
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
@@ -41,13 +41,13 @@ async function getSummaryStats(userId: string) {
   const [statusCounts, monthlyBilling] = await Promise.all([
     prisma.quote.groupBy({
       by: ["status"],
-      where: { userId },
+      where: { workspaceId },
       _count: { _all: true },
     }),
     prisma.quote.groupBy({
       by: ["currency"],
       where: {
-        userId,
+        workspaceId,
         status: "ACCEPTED",
         issuedAt: { gte: startOfMonth, lt: startOfNextMonth },
       },
@@ -71,7 +71,7 @@ async function getSummaryStats(userId: string) {
   };
 }
 
-async function getMonthlyBillingTrend(userId: string) {
+async function getMonthlyBillingTrend(workspaceId: string) {
   const now = new Date();
   const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
@@ -80,12 +80,12 @@ async function getMonthlyBillingTrend(userId: string) {
   const [thisMonthByCurrency, lastMonthByCurrency] = await Promise.all([
     prisma.quote.groupBy({
       by: ["currency"],
-      where: { userId, status: { in: ["ACCEPTED", "PAID"] }, issuedAt: { gte: startOfThisMonth, lt: startOfNextMonth } },
+      where: { workspaceId, status: { in: ["ACCEPTED", "PAID"] }, issuedAt: { gte: startOfThisMonth, lt: startOfNextMonth } },
       _sum: { total: true },
     }),
     prisma.quote.groupBy({
       by: ["currency"],
-      where: { userId, status: { in: ["ACCEPTED", "PAID"] }, issuedAt: { gte: startOfLastMonth, lt: startOfThisMonth } },
+      where: { workspaceId, status: { in: ["ACCEPTED", "PAID"] }, issuedAt: { gte: startOfLastMonth, lt: startOfThisMonth } },
       _sum: { total: true },
     }),
   ]);
@@ -111,14 +111,14 @@ async function getMonthlyBillingTrend(userId: string) {
 }
 
 export default async function Home() {
-  const user = await getCurrentUser();
+  const { user, workspace } = await requireWorkspaceMembership();
   const name = firstNameOf(user.displayName);
   const greeting = greetingFor(new Date().getHours());
   const now = new Date();
   const [stats, billingTrend, recentActivity] = await Promise.all([
-    getSummaryStats(user.id),
-    getMonthlyBillingTrend(user.id),
-    getRecentActivity(user.id, 3),
+    getSummaryStats(workspace.id),
+    getMonthlyBillingTrend(workspace.id),
+    getRecentActivity(workspace.id, 3),
   ]);
 
   return (

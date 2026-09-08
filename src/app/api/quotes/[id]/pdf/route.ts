@@ -1,7 +1,7 @@
 import { createElement, type ReactElement } from "react";
 import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/current-user";
+import { requireWorkspaceMembership } from "@/lib/workspace-access";
 import QuotePdfDocument from "@/lib/pdf/QuotePdfDocument";
 import WebQuoteDocument from "@/lib/pdf/WebQuoteDocument";
 import { getLogoBuffers } from "@/lib/pdf/logo";
@@ -10,17 +10,22 @@ import { parseWebQuoteDetails } from "@/lib/web-quote";
 
 export async function GET(_request: Request, ctx: RouteContext<"/api/quotes/[id]/pdf">) {
   const { id } = await ctx.params;
-  const user = await getCurrentUser();
+  let workspaceId: string;
+  try {
+    workspaceId = (await requireWorkspaceMembership()).workspace.id;
+  } catch {
+    return new Response("No autorizado.", { status: 403 });
+  }
 
-  const quote = await prisma.quote.findUnique({
-    where: { id },
+  const quote = await prisma.quote.findFirst({
+    where: { id, workspaceId },
     include: {
       client: true,
       lineItems: { orderBy: { sortOrder: "asc" }, include: { service: true } },
     },
   });
 
-  if (!quote || quote.userId !== user.id) {
+  if (!quote) {
     return new Response("No autorizado.", { status: 403 });
   }
 

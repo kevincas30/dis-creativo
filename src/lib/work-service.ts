@@ -1,5 +1,6 @@
 import { Prisma, type PrismaClient } from "@/generated/prisma/client";
 import { PROJECT_STATUS_CONFIG, PROJECT_STATUS_ORDER } from "@/lib/project-status";
+import type { WorkspaceActor } from "@/lib/workspace-access";
 
 export function textField(form: FormData, key: string, required = false): string | null {
   const raw = form.get(key);
@@ -23,10 +24,10 @@ function moneyField(form: FormData, key: string) {
 }
 
 // A project row lock serializes payments/configuration/period creation for this project.
-export async function runWorkCommand(db: PrismaClient, actorId: string, projectId: string, form: FormData) {
+export async function runWorkCommand(db: PrismaClient, actor: WorkspaceActor, projectId: string, form: FormData) {
   return db.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT "id" FROM "projects" WHERE "id" = ${projectId} FOR UPDATE`;
-    const project = await tx.project.findFirst({ where: { id: projectId, userId: actorId } });
+    await tx.$queryRaw`SELECT "id" FROM "projects" WHERE "id" = ${projectId} AND "workspaceId" = ${actor.workspaceId} FOR UPDATE`;
+    const project = await tx.project.findFirst({ where: { id: projectId, workspaceId: actor.workspaceId } });
     if (!project) throw new Error("Proyecto no encontrado o sin acceso.");
     const command = textField(form, "command", true);
     const periodId = textField(form, "periodId");
@@ -34,7 +35,7 @@ export async function runWorkCommand(db: PrismaClient, actorId: string, projectI
     if (periodId && !period) throw new Error("El periodo no pertenece al proyecto.");
     const scope = period ?? project;
     const where = { projectId, periodId };
-    const record = (action: string, description: string, targetPeriod = periodId) => tx.activityRecord.create({ data: { actorId, projectId, periodId: targetPeriod, clientId: project.clientId, action, description } });
+    const record = (action: string, description: string, targetPeriod = periodId) => tx.activityRecord.create({ data: { workspaceId: actor.workspaceId, actorId: actor.userId, projectId, periodId: targetPeriod, clientId: project.clientId, action, description } });
     const requireScope = () => {
       if ((project.kind === "RECURRING") !== Boolean(period)) throw new Error("Selecciona un periodo para este proyecto recurrente.");
     };
@@ -79,7 +80,7 @@ export async function runWorkCommand(db: PrismaClient, actorId: string, projectI
         } });
         if (source && (copy("copyTasks") || copy("copyStructure"))) {
           const items = source.workItems.filter((item) => (copy("copyTasks") && item.recurring) || copy("copyStructure"));
-          for (const item of items) await tx.workItem.create({ data: { projectId, periodId: created.id, title: item.title, kind: item.kind, priority: item.priority, recurring: item.recurring, dueDate: copy("copyConfig") ? shifted(item.dueDate) : null } });
+          for (const item of items) await tx.workItem.create({ data: { workspaceId: actor.workspaceId, projectId, periodId: created.id, title: item.title, kind: item.kind, priority: item.priority, recurring: item.recurring, dueDate: copy("copyConfig") ? shifted(item.dueDate) : null } });
         }
         if (copy("copyTeam")) {
           const assignments = source?.assignments ?? await tx.workAssignment.findMany({ where: { projectId, periodId: null } });
@@ -125,6 +126,7 @@ export async function runWorkCommand(db: PrismaClient, actorId: string, projectI
         return;
       }
       case "unassign": {
+        if (actor.role !== "ADMIN") throw new Error("Solo un administrador puede retirar miembros del equipo.");
         const assignment = await tx.workAssignment.findFirst({ where: { ...where, id: textField(form, "assignmentId", true)! }, include: { user: true } });
         if (!assignment) throw new Error("Asignación no encontrada.");
         await tx.workAssignment.delete({ where: { id: assignment.id } });
@@ -156,7 +158,7 @@ export async function runWorkCommand(db: PrismaClient, actorId: string, projectI
           if (existing.projectId !== projectId || existing.periodId !== periodId || !existing.amount.equals(amount) || existing.paidAt.getTime() !== paidAt.getTime()) throw new Error("La solicitud de pago ya se utilizó.");
           return;
         }
-        await tx.payment.create({ data: { ...where, requestId, amount, paidAt, currency: scope.currency, recordedById: actorId, note: textField(form, "note") } });
+        await tx.payment.create({ data: { ...where, requestId, amount, paidAt, currency: scope.currency, recordedById: actor.userId, note: textField(form, "note") } });
         await record("PAYMENT_RECORDED", `Pago registrado: ${amount.toFixed(2)} ${scope.currency}`);
         return;
       }
@@ -166,7 +168,7 @@ export async function runWorkCommand(db: PrismaClient, actorId: string, projectI
         const priority = textField(form, "priority") ?? "NORMAL";
         if (!["TASK", "DELIVERABLE"].includes(kind) || !["LOW", "NORMAL", "HIGH"].includes(priority)) throw new Error("Tipo o prioridad no válidos.");
         const title = textField(form, "title", true)!;
-        await tx.workItem.create({ data: { ...where, title, kind: kind as never, priority: priority as never, dueDate: dateField(form, "dueDate"), recurring: form.get("recurring") === "on" } });
+        await tx.workItem.create({ data: { workspaceId: actor.workspaceId, ...where, title, kind: kind as never, priority: priority as never, dueDate: dateField(form, "dueDate"), recurring: form.get("recurring") === "on" } });
         await record("WORK_CREATED", `${kind === "TASK" ? "Tarea" : "Entregable"} creado: ${title}`);
         return;
       }
@@ -182,25 +184,25 @@ export async function runWorkCommand(db: PrismaClient, actorId: string, projectI
       }
       case "assign": {
         const userId = textField(form, "userId", true)!;
-        const assignedUser = await tx.user.findUnique({ where: { id: userId } });
-        if (!assignedUser) throw new Error("Usuario no encontrado.");
+        const assignedUser = await tx.workspaceMember.findFirst({ where: { workspaceId: actor.workspaceId, userId }, include: { user: true } });
+        if (!assignedUser) throw new Error("El usuario no pertenece a este workspace.");
         const existing = await tx.workAssignment.findFirst({ where: { ...where, userId } });
         if (!existing) {
           await tx.workAssignment.create({ data: { ...where, userId } });
-          await record("TEAM_ASSIGNED", `Miembro asignado al equipo: ${assignedUser.displayName}`);
+          await record("TEAM_ASSIGNED", `Miembro asignado al equipo: ${assignedUser.user.displayName}`);
         }
         return;
       }
       case "link": {
         const clientId = textField(form, "clientId", true)!;
-        const client = await tx.client.findFirst({ where: { id: clientId, archivedAt: null } });
+        const client = await tx.client.findFirst({ where: { id: clientId, workspaceId: actor.workspaceId, archivedAt: null } });
         if (!client) throw new Error("Cliente no disponible.");
         if (project.clientId && project.clientId !== clientId) throw new Error("El cliente ya está vinculado. No se reasigna su historial desde aquí.");
         const quoteId = textField(form, "quoteId");
-        if (quoteId && !await tx.quote.findFirst({ where: { id: quoteId, userId: actorId, clientId } })) throw new Error("El presupuesto no corresponde a este cliente.");
+        if (quoteId && !await tx.quote.findFirst({ where: { id: quoteId, workspaceId: actor.workspaceId, clientId } })) throw new Error("El presupuesto no corresponde a este cliente.");
         if (project.quoteId && project.quoteId !== quoteId) throw new Error("El presupuesto de origen ya está vinculado.");
         await tx.project.update({ where: { id: projectId }, data: { clientId, quoteId } });
-        await tx.activityRecord.create({ data: { actorId, projectId, clientId, action: "LINK_CONFIRMED", description: "Cliente y presupuesto de origen vinculados explícitamente" } });
+        await tx.activityRecord.create({ data: { workspaceId: actor.workspaceId, actorId: actor.userId, projectId, clientId, action: "LINK_CONFIRMED", description: "Cliente y presupuesto de origen vinculados explícitamente" } });
         return;
       }
       default: throw new Error("Acción desconocida.");
@@ -208,13 +210,13 @@ export async function runWorkCommand(db: PrismaClient, actorId: string, projectI
   }, { timeout: 15000 });
 }
 
-export async function archiveClientRecord(db: PrismaClient, actorId: string, clientId: string, archived: boolean) {
+export async function archiveClientRecord(db: PrismaClient, actor: WorkspaceActor, clientId: string, archived: boolean) {
   return db.$transaction(async (tx) => {
-    const user = await tx.user.findUnique({ where: { id: actorId } });
-    if (!user || user.role !== "ADMIN") throw new Error("Solo un administrador puede archivar o restaurar clientes.");
-    const client = await tx.client.findUniqueOrThrow({ where: { id: clientId } });
+    if (actor.role !== "ADMIN") throw new Error("Solo un administrador puede archivar o restaurar clientes.");
+    const client = await tx.client.findFirst({ where: { id: clientId, workspaceId: actor.workspaceId } });
+    if (!client) throw new Error("Cliente no encontrado o sin acceso.");
     if (Boolean(client.archivedAt) === archived) return;
     await tx.client.update({ where: { id: clientId }, data: { archivedAt: archived ? new Date() : null } });
-    await tx.activityRecord.create({ data: { actorId, clientId, action: archived ? "CLIENT_ARCHIVED" : "CLIENT_RESTORED", description: archived ? "Cliente archivado; historial conservado" : "Cliente restaurado" } });
+    await tx.activityRecord.create({ data: { workspaceId: actor.workspaceId, actorId: actor.userId, clientId, action: archived ? "CLIENT_ARCHIVED" : "CLIENT_RESTORED", description: archived ? "Cliente archivado; historial conservado" : "Cliente restaurado" } });
   });
 }

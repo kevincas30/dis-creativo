@@ -1,19 +1,19 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/current-user";
+import { requireWorkspaceMembership } from "@/lib/workspace-access";
 import { buildClientCards } from "@/lib/client-relations";
 import DashboardBackground from "@/components/dashboard/DashboardBackground";
 import ClientesPageClient from "@/components/dashboard/clientes/ClientesPageClient";
 
 export default async function ClientesPage({ searchParams }: { searchParams: Promise<{ archived?: string }> }) {
   const archived = (await searchParams).archived === "1";
-  const user = await getCurrentUser();
+  const { workspace } = await requireWorkspaceMembership();
 
   const [clients, projects, quotes, events] = await Promise.all([
-    prisma.client.findMany({ where: { archivedAt: archived ? { not: null } : null }, orderBy: { name: "asc" } }),
-    prisma.project.findMany({ where: { userId: user.id }, select: { client: true, clientId: true, updatedAt: true } }),
-    prisma.quote.findMany({ where: { userId: user.id, clientId: { not: null } }, select: { clientId: true, updatedAt: true } }),
-    prisma.event.findMany({ where: { userId: user.id, clientId: { not: null } }, select: { clientId: true, startAt: true } }),
+    prisma.client.findMany({ where: { workspaceId: workspace.id, archivedAt: archived ? { not: null } : null }, orderBy: { name: "asc" } }),
+    prisma.project.findMany({ where: { workspaceId: workspace.id }, select: { client: true, clientId: true, updatedAt: true } }),
+    prisma.quote.findMany({ where: { workspaceId: workspace.id, clientId: { not: null } }, select: { clientId: true, updatedAt: true } }),
+    prisma.event.findMany({ where: { workspaceId: workspace.id, clientId: { not: null } }, select: { clientId: true, startAt: true } }),
   ]);
 
   const clientCards = buildClientCards(clients, projects, quotes, events);

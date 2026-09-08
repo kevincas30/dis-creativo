@@ -67,8 +67,9 @@ export async function computeWebLine(
   code: WebServiceCode,
   currency: QuoteCurrency,
   quantity: number,
+  workspaceId: string,
 ): Promise<WebLineResult | null> {
-  return computeCatalogLine(code, currency, quantity);
+  return computeCatalogLine(code, currency, quantity, workspaceId);
 }
 
 export type WebExtras = {

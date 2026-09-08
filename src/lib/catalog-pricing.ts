@@ -42,11 +42,12 @@ export async function computeCatalogLine(
   code: string,
   currency: QuoteCurrency,
   quantity: number,
+  workspaceId: string,
 ): Promise<CatalogLineResult | null> {
   if (!(quantity > 0)) return null;
 
-  const service = await prisma.service.findUnique({
-    where: { code },
+  const service = await prisma.service.findFirst({
+    where: { code, workspaceId },
     include: { pricingRules: true, discountRules: true },
   });
   if (!service) return null;

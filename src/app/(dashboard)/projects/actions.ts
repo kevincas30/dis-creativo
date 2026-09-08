@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/current-user";
+import { requireWorkspaceAdmin, requireWorkspaceMembership } from "@/lib/workspace-access";
 import { serializeProject } from "@/lib/project-presenter";
 import { PROJECT_STATUS_ORDER } from "@/lib/project-status";
 import type { ProjectStatus } from "@/generated/prisma/enums";
@@ -37,7 +37,8 @@ function readProgress(formData: FormData): number | undefined {
 }
 
 export async function createProject(formData: FormData) {
-  const user = await getCurrentUser();
+  const context = await requireWorkspaceMembership();
+  const { user, workspace } = context;
 
   const name = readTextField(formData, "name");
   const client = readTextField(formData, "client");
@@ -49,12 +50,13 @@ export async function createProject(formData: FormData) {
   const quoteId = readTextField(formData, "quoteId");
   const kind = readTextField(formData, "kind") ?? "ONE_OFF";
   if (!["ONE_OFF", "RECURRING"].includes(kind)) throw new Error("Tipo de proyecto inválido.");
-  if (clientId && !await prisma.client.findFirst({ where: { id: clientId, archivedAt: null } })) throw new Error("Cliente no disponible.");
-  if (quoteId && (!clientId || !await prisma.quote.findFirst({ where: { id: quoteId, clientId, userId: user.id } }))) throw new Error("Presupuesto no válido para este cliente.");
+  if (clientId && !await prisma.client.findFirst({ where: { id: clientId, workspaceId: workspace.id, archivedAt: null } })) throw new Error("Cliente no disponible.");
+  if (quoteId && (!clientId || !await prisma.quote.findFirst({ where: { id: quoteId, workspaceId: workspace.id, clientId } }))) throw new Error("Presupuesto no válido para este cliente.");
   const project = await prisma.$transaction(async (tx) => {
     const created = await tx.project.create({
     data: {
       userId: user.id,
+      workspaceId: workspace.id,
       clientId, quoteId, kind: kind as "ONE_OFF" | "RECURRING",
       name,
       client,
@@ -65,7 +67,7 @@ export async function createProject(formData: FormData) {
     },
   });
 
-    await tx.activityRecord.create({ data: { actorId: user.id, projectId: created.id, clientId, action: "PROJECT_CREATED", description: `Proyecto creado: ${created.name}` } });
+    await tx.activityRecord.create({ data: { workspaceId: workspace.id, actorId: user.id, projectId: created.id, clientId, action: "PROJECT_CREATED", description: `Proyecto creado: ${created.name}` } });
     return created;
   });
 
@@ -75,7 +77,8 @@ export async function createProject(formData: FormData) {
 }
 
 export async function updateProject(projectId: string, formData: FormData) {
-  const user = await getCurrentUser();
+  const context = await requireWorkspaceMembership();
+  const { user, workspace } = context;
 
   const name = readTextField(formData, "name");
   const client = readTextField(formData, "client");
@@ -83,10 +86,8 @@ export async function updateProject(projectId: string, formData: FormData) {
     throw new Error("El nombre y el cliente son obligatorios.");
   }
 
-  const existing = await prisma.project.findUniqueOrThrow({ where: { id: projectId } });
-  if (existing.userId !== user.id) {
-    throw new Error("No autorizado.");
-  }
+  const existing = await prisma.project.findFirst({ where: { id: projectId, workspaceId: workspace.id } });
+  if (!existing) throw new Error("Proyecto no disponible en el workspace actual.");
 
   const project = await prisma.$transaction(async (tx) => {
   const updated = await tx.project.update({
@@ -103,7 +104,7 @@ export async function updateProject(projectId: string, formData: FormData) {
     },
   });
 
-    if (updated.status !== existing.status) await tx.activityRecord.create({ data: { actorId: user.id, projectId, clientId: existing.clientId, action: "STATUS_CHANGED", description: `${existing.status} → ${updated.status}` } });
+    if (updated.status !== existing.status) await tx.activityRecord.create({ data: { workspaceId: workspace.id, actorId: user.id, projectId, clientId: existing.clientId, action: "STATUS_CHANGED", description: `${existing.status} → ${updated.status}` } });
     return updated;
   });
   revalidatePath("/");
@@ -114,14 +115,13 @@ export async function updateProject(projectId: string, formData: FormData) {
 }
 
 export async function deleteProject(projectId: string) {
-  const user = await getCurrentUser();
+  const context = await requireWorkspaceAdmin();
 
-  const existing = await prisma.project.findUniqueOrThrow({ where: { id: projectId } });
-  if (existing.userId !== user.id) {
-    throw new Error("No autorizado.");
-  }
+  const existing = await prisma.project.findFirst({ where: { id: projectId, workspaceId: context.workspace.id } });
+  if (!existing) throw new Error("Proyecto no disponible en el workspace actual.");
 
-  const references = await prisma.project.findUniqueOrThrow({ where: { id: projectId }, include: { _count: { select: { events: true, periods: true, payments: true, workItems: true, assignments: true, activityRecords: true } } } });
+  const references = await prisma.project.findFirst({ where: { id: projectId, workspaceId: context.workspace.id }, include: { _count: { select: { events: true, periods: true, payments: true, workItems: true, assignments: true, activityRecords: true } } } });
+  if (!references) throw new Error("Proyecto no disponible en el workspace actual.");
   if (Object.values(references._count).some(Boolean) || references.clientId || references.quoteId) throw new Error("Este proyecto tiene historial o relaciones. Ciérralo o cancélalo para conservar sus datos.");
   await prisma.project.delete({ where: { id: projectId } });
 

@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/current-user";
+import { requireWorkspaceMembership } from "@/lib/workspace-access";
 import { getWorkView } from "@/lib/work-view";
 import ProjectWorkPanel from "@/components/dashboard/projects/ProjectWorkPanel";
 import { serializeProject } from "@/lib/project-presenter";
@@ -9,14 +9,14 @@ import ProjectDetailClient from "@/components/dashboard/projects/ProjectDetailCl
 
 export default async function ProjectDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ period?: string }> }) {
   const { id } = await params;
-  const user = await getCurrentUser();
+  const { workspace } = await requireWorkspaceMembership();
 
-  const project = await prisma.project.findUnique({ where: { id } });
-  if (!project || project.userId !== user.id) {
+  const project = await prisma.project.findFirst({ where: { id, workspaceId: workspace.id } });
+  if (!project) {
     notFound();
   }
 
-  const view = await getWorkView(id, user.id);
+  const view = await getWorkView(id, workspace.id);
   const { period } = await searchParams;
   return (
     <div className="relative flex h-full flex-col overflow-y-auto px-6 py-10 sm:px-10 lg:px-16">

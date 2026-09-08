@@ -11,6 +11,16 @@ export type CurrentWorkspaceContext = {
   workspace: Workspace;
 };
 
+export type WorkspaceActor = {
+  userId: string;
+  workspaceId: string;
+  role: WorkspaceRole;
+};
+
+export function workspaceActor(context: CurrentWorkspaceContext): WorkspaceActor {
+  return { userId: context.user.id, workspaceId: context.workspace.id, role: context.membership.role };
+}
+
 export class WorkspaceAccessError extends Error {
   constructor(
     public readonly code: "NO_WORKSPACE_MEMBERSHIP" | "AMBIGUOUS_WORKSPACE" | "ADMIN_REQUIRED",

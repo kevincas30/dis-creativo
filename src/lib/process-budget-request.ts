@@ -211,9 +211,9 @@ type ExtractedPayload = {
   };
 };
 
-async function buildCatalogContext() {
+async function buildCatalogContext(workspaceId: string) {
   const services = await prisma.service.findMany({
-    where: { isActive: true },
+    where: { workspaceId, isActive: true },
     include: { pricingRules: true },
     orderBy: [{ category: "asc" }, { name: "asc" }],
   });
@@ -263,9 +263,9 @@ PRESUPUESTOS DE SITIOS WEB: cuando el servicio solicitado es el diseño/desarrol
 Para cualquier proyecto que NO sea una página web, deja isWebProject=false y el resto de "webDetails" vacío — no lo llenes "por si acaso".`;
 }
 
-async function loadHistory(quoteId: string): Promise<Content[]> {
+async function loadHistory(quoteId: string, workspaceId: string): Promise<Content[]> {
   const messages = await prisma.conversationMessage.findMany({
-    where: { quoteId },
+    where: { quoteId, quote: { workspaceId } },
     orderBy: { createdAt: "asc" },
   });
   return messages.map((m) => ({
@@ -405,13 +405,23 @@ export type ProcessBudgetResult = {
  * total). Devuelve el resumen para el chat y el snapshot del presupuesto ya
  * actualizado para refrescar el panel derecho.
  */
-export async function processBudgetRequest(message: string, quoteId: string): Promise<ProcessBudgetResult> {
+export async function processBudgetRequest(
+  message: string,
+  quoteId: string,
+  workspaceId: string,
+): Promise<ProcessBudgetResult> {
   const text = message.trim();
   if (!text) throw new Error("Mensaje vacío.");
 
+  const authorizedQuote = await prisma.quote.findFirst({
+    where: { id: quoteId, workspaceId },
+    select: { id: true },
+  });
+  if (!authorizedQuote) throw new Error("Presupuesto no encontrado en el workspace actual.");
+
   await prisma.conversationMessage.create({ data: { quoteId, role: "user", content: text } });
 
-  const [history, catalogText] = await Promise.all([loadHistory(quoteId), buildCatalogContext()]);
+  const [history, catalogText] = await Promise.all([loadHistory(quoteId, workspaceId), buildCatalogContext(workspaceId)]);
 
   const response = await genAI.models.generateContent({
     model: GEMINI_MODEL,
@@ -434,21 +444,23 @@ export async function processBudgetRequest(message: string, quoteId: string): Pr
     summary =
       "⚠️ No pude procesar esa respuesta correctamente. ¿Puedes reformularla o darme los datos de nuevo?";
     await prisma.conversationMessage.create({ data: { quoteId, role: "assistant", content: summary } });
-    const quote = await prisma.quote.findUniqueOrThrow({
-      where: { id: quoteId },
+    const quote = await prisma.quote.findFirst({
+      where: { id: quoteId, workspaceId },
       include: { client: true, lineItems: { orderBy: { sortOrder: "asc" } }, notes: true },
     });
+    if (!quote) throw new Error("Presupuesto no encontrado en el workspace actual.");
     return { summary, quote: serializeQuote(quote), canExportPdf: quote.lineItems.length > 0 && !!quote.client };
   }
 
   const txResult = await prisma.$transaction(async (tx) => {
-    let quote = await tx.quote.findUniqueOrThrow({ where: { id: quoteId } });
+    let quote = await tx.quote.findFirst({ where: { id: quoteId, workspaceId } });
+    if (!quote) throw new Error("Presupuesto no encontrado en el workspace actual.");
 
     // 1) Cliente: se guarda en cuanto tengamos al menos el nombre, aunque el
     // resto (país, servicios) todavía falte.
     if (payload.client.name) {
       const existing = await tx.client.findFirst({
-        where: { name: { equals: payload.client.name, mode: "insensitive" }, archivedAt: null },
+        where: { workspaceId, name: { equals: payload.client.name, mode: "insensitive" }, archivedAt: null },
       });
 
       const countryConfig = resolveCountry(payload.client.country);
@@ -458,6 +470,7 @@ export async function processBudgetRequest(message: string, quoteId: string): Pr
         : (
             await tx.client.create({
               data: {
+                workspaceId,
                 name: payload.client.name,
                 company: payload.client.company || undefined,
                 defaultCurrency: countryConfig?.currency,
@@ -477,7 +490,8 @@ export async function processBudgetRequest(message: string, quoteId: string): Pr
           taxRatePercent: countryConfig?.taxRatePercent ?? quote.taxRatePercent,
         },
       });
-      quote = await tx.quote.findUniqueOrThrow({ where: { id: quoteId } });
+      quote = await tx.quote.findFirst({ where: { id: quoteId, workspaceId } });
+      if (!quote) throw new Error("Presupuesto no encontrado en el workspace actual.");
     }
 
     // 2) Catálogos oficiales (redes sociales + servicios web): el backend es
@@ -488,7 +502,7 @@ export async function processBudgetRequest(message: string, quoteId: string): Pr
     if (payload.socialServices.length > 0 && quote.currency) {
       const currency = quote.currency as QuoteCurrency;
       const computed = await Promise.all(
-        payload.socialServices.map((item) => computeSocialLine(item.code, currency, item.quantity)),
+        payload.socialServices.map((item) => computeSocialLine(item.code, currency, item.quantity, workspaceId)),
       );
       socialResults = computed.filter((line): line is SocialLineResult => line !== null);
 
@@ -503,7 +517,7 @@ export async function processBudgetRequest(message: string, quoteId: string): Pr
     if (payload.webServices.length > 0 && quote.currency) {
       const currency = quote.currency as QuoteCurrency;
       const computed = await Promise.all(
-        payload.webServices.map((item) => computeWebLine(item.code, currency, item.quantity)),
+        payload.webServices.map((item) => computeWebLine(item.code, currency, item.quantity, workspaceId)),
       );
       webResults = computed.filter((line): line is SocialLineResult => line !== null);
 
@@ -585,10 +599,11 @@ export async function processBudgetRequest(message: string, quoteId: string): Pr
       });
     }
 
-    const finalQuote = await tx.quote.findUniqueOrThrow({
-      where: { id: quoteId },
+    const finalQuote = await tx.quote.findFirst({
+      where: { id: quoteId, workspaceId },
       include: { client: true, lineItems: { orderBy: { sortOrder: "asc" } }, notes: true },
     });
+    if (!finalQuote) throw new Error("Presupuesto no encontrado en el workspace actual.");
 
     return { quote: finalQuote, catalogResults, allSurcharges };
   });

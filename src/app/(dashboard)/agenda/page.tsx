@@ -1,15 +1,15 @@
 import { prisma } from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/current-user";
+import { requireWorkspaceMembership } from "@/lib/workspace-access";
 import { serializeEvent } from "@/lib/event-presenter";
 import DashboardBackground from "@/components/dashboard/DashboardBackground";
 import AgendaPageClient from "@/components/dashboard/agenda/AgendaPageClient";
 
 export default async function AgendaComercialPage() {
-  const user = await getCurrentUser();
+  const { workspace } = await requireWorkspaceMembership();
 
   const [events, clients, projects] = await Promise.all([
     prisma.event.findMany({
-      where: { userId: user.id },
+      where: { workspaceId: workspace.id },
       orderBy: { startAt: "asc" },
       select: {
         id: true,
@@ -25,8 +25,8 @@ export default async function AgendaComercialPage() {
         project: { select: { id: true, name: true } },
       },
     }),
-    prisma.client.findMany({ where: { archivedAt: null }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
-    prisma.project.findMany({ where: { userId: user.id }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    prisma.client.findMany({ where: { workspaceId: workspace.id, archivedAt: null }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    prisma.project.findMany({ where: { workspaceId: workspace.id }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
   ]);
 
   return (

@@ -29,14 +29,23 @@ async function main() {
   let checks = 0;
   const check = (label: string) => { checks++; console.log(`✓ ${label}`); };
   const form = (command: string, fields: Record<string, string> = {}) => { const f = new FormData(); f.set("command", command); for (const [key, value] of Object.entries(fields)) f.set(key, value); return f; };
-  const command = (id: string, action: string, fields: Record<string, string> = {}) => runWorkCommand(db, "owner", id, form(action, fields));
+  const ownerActor = { userId: "owner", workspaceId: "workspace", role: "ADMIN" as const };
+  const memberActor = { userId: "other", workspaceId: "workspace", role: "MEMBER" as const };
+  const command = (id: string, action: string, fields: Record<string, string> = {}) => runWorkCommand(db, ownerActor, id, form(action, fields));
   try {
     const legacy = await db.project.findUniqueOrThrow({ where: { id: "legacy" } });
     assert.equal(legacy.status, "DONE"); assert.equal(legacy.kind, "ONE_OFF"); assert.equal(legacy.clientId, null);
     assert.equal(await db.payment.count(), 0); assert.equal(await db.activityRecord.count(), 0);
     assert.equal((await db.quote.findUniqueOrThrow({ where: { id: "quote" } })).status, "PAID");
     check("additive migration preserves old states, quote PAID and free-text client; no invented payments/activity");
-    await db.project.create({ data: { id: "one", userId: "owner", name: "Website", client: "Legacy client", clientId: "client", dueDate: new Date("2020-01-01") } });
+    await db.workspace.create({ data: { id: "workspace", name: "Test workspace" } });
+    await db.workspaceMember.createMany({ data: [
+      { id: "owner-member", workspaceId: "workspace", userId: "owner", role: "ADMIN" },
+      { id: "other-member", workspaceId: "workspace", userId: "other", role: "MEMBER" },
+    ] });
+    await db.client.update({ where: { id: "client" }, data: { workspaceId: "workspace" } });
+    await db.quote.update({ where: { id: "quote" }, data: { workspaceId: "workspace" } });
+    await db.project.create({ data: { id: "one", workspaceId: "workspace", userId: "owner", name: "Website", client: "Legacy client", clientId: "client", dueDate: new Date("2020-01-01") } });
     await command("one", "finance", { agreedTotal: "100.10", currency: "EUR", paymentDueDate: "2020-01-01" });
     await command("one", "status", { status: "DELIVERED" });
     let project = await db.project.findUniqueOrThrow({ where: { id: "one" } });
@@ -61,7 +70,7 @@ async function main() {
     project = await db.project.findUniqueOrThrow({ where: { id: "one" } });
     assert.equal(projectAttention(project, "2026-09-07"), null);
     check("closed projects leave active view; paused projects have no overdue delivery warning");
-    await db.project.create({ data: { id: "monthly", userId: "owner", name: "Social", client: "Legacy client", clientId: "client", kind: "RECURRING" } });
+    await db.project.create({ data: { id: "monthly", workspaceId: "workspace", userId: "owner", name: "Social", client: "Legacy client", clientId: "client", kind: "RECURRING" } });
     const first = await command("monthly", "createPeriod", { label: "August", startDate: "2026-08-01", dueDate: "2026-08-31" });
     assert.ok(first);
     await command("monthly", "finance", { periodId: first, currency: "EUR", agreedTotal: "300", paymentDueDate: "2026-08-31" });
@@ -92,9 +101,14 @@ async function main() {
     await assert.rejects(command("one", "createPeriod", { label: "Invalid", startDate: "2026-01-01" }), /único/);
     await assert.rejects(command("monthly", "payment", { amount: "1", paidAt: "2026-01-01", requestId: "root-payment" }), /periodo/);
     await assert.rejects(command("one", "payment", { periodId: first, amount: "1", paidAt: "2026-01-01", requestId: "wrong-period" }), /pertenece/);
-    await assert.rejects(runWorkCommand(db, "other", "monthly", form("status", { periodId: first, status: "DELIVERED" })), /acceso/);
-    check("empty periods, complete checklist copy, duplicate-date rejection and cross-project/user protection");
-    await db.project.create({ data: { id: "convert", userId: "owner", name: "Existing retainer", client: "Legacy client", clientId: "client", status: "IN_PROGRESS", dueDate: new Date("2026-12-31"), agreedTotal: "90", currency: "EUR" } });
+    await runWorkCommand(db, memberActor, "monthly", form("dates", { periodId: first, dueDate: "2026-08-31" }));
+    await db.workspace.create({ data: { id: "other-workspace", name: "Other workspace" } });
+    await db.workspaceMember.create({ data: { id: "other-workspace-member", workspaceId: "other-workspace", userId: "other", role: "ADMIN" } });
+    await db.project.create({ data: { id: "foreign", workspaceId: "other-workspace", userId: "other", name: "Foreign", client: "Foreign client" } });
+    assert.equal(await db.project.findFirst({ where: { id: "foreign", workspaceId: "workspace" } }), null);
+    await assert.rejects(command("foreign", "status", { status: "IN_PROGRESS" }), /acceso/);
+    check("same-workspace members can update shared work; a direct foreign project ID is rejected");
+    await db.project.create({ data: { id: "convert", workspaceId: "workspace", userId: "owner", name: "Existing retainer", client: "Legacy client", clientId: "client", status: "IN_PROGRESS", dueDate: new Date("2026-12-31"), agreedTotal: "90", currency: "EUR" } });
     await command("convert", "addWork", { title: "Existing task" });
     await command("convert", "payment", { amount: "20", paidAt: "2026-09-01", requestId: "existing-payment" });
     await command("convert", "assign", { userId: "other" });
@@ -110,16 +124,20 @@ async function main() {
     await assert.rejects(db.client.delete({ where: { id: "client" } }));
     check("database constraints reject wrong payment scope and deletion of referenced records");
     const counts = [await db.project.count(), await db.projectPeriod.count(), await db.payment.count(), await db.quote.count(), await db.workItem.count()];
-    await archiveClientRecord(db, "owner", "client", true);
+    await assert.rejects(archiveClientRecord(db, memberActor, "client", true), /administrador/);
+    const assignment = await db.workAssignment.findFirstOrThrow({ where: { projectId: "monthly", periodId: first } });
+    await assert.rejects(runWorkCommand(db, memberActor, "monthly", form("unassign", { periodId: first, assignmentId: assignment.id })), /administrador/);
+    await archiveClientRecord(db, ownerActor, "client", true);
     assert.ok((await db.client.findUniqueOrThrow({ where: { id: "client" } })).archivedAt);
     assert.deepEqual([await db.project.count(), await db.projectPeriod.count(), await db.payment.count(), await db.quote.count(), await db.workItem.count()], counts);
-    await archiveClientRecord(db, "owner", "client", false);
+    await archiveClientRecord(db, ownerActor, "client", false);
     assert.equal((await db.client.findUniqueOrThrow({ where: { id: "client" } })).archivedAt, null);
     assert.equal(await db.activityRecord.count({ where: { action: "CLIENT_ARCHIVED" } }), 1);
     const paymentEvents = await db.activityRecord.count({ where: { action: "PAYMENT_RECORDED" } });
     assert.equal(paymentEvents, await db.payment.count());
-    assert.equal(await db.activityRecord.count({ where: { actorId: { not: "owner" } } }), 0);
-    check("archive/restore persists without losing relations; activity has actual actor and no duplicate payment events");
+    assert.ok(await db.activityRecord.count({ where: { actorId: "other" } }));
+    assert.equal(await db.workItem.count({ where: { workspaceId: "workspace" } }), await db.workItem.count());
+    check("only admins archive; root work records keep workspace and activities preserve their actor");
     assert.equal(nextMonthDate("2026-01-31"), "2026-02-28");
     assert.equal(nextMonthDate("2028-01-31"), "2028-02-29");
     assert.equal(financialSummary(null, ["10.00"], null, "2026-01-01").outstanding, null);

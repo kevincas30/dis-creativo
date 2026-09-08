@@ -41,8 +41,9 @@ export async function computeSocialLine(
   code: SocialServiceCode,
   currency: QuoteCurrency,
   quantity: number,
+  workspaceId: string,
 ): Promise<SocialLineResult | null> {
-  return computeCatalogLine(code, currency, quantity);
+  return computeCatalogLine(code, currency, quantity, workspaceId);
 }
 
 export type SocialExtras = {

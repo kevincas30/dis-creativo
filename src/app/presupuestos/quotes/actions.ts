@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/current-user";
+import { requireWorkspaceAdmin, requireWorkspaceMembership } from "@/lib/workspace-access";
 import { firstNameOf } from "@/lib/names";
 import type { Prisma } from "@/generated/prisma/client";
 import type { QuoteStatus } from "@/generated/prisma/enums";
@@ -36,8 +36,8 @@ export async function createDraftQuote() { return makeDraftQuote(); }
 export async function createDraftQuoteForClient(clientId: string) { return makeDraftQuote(clientId); }
 
 async function makeDraftQuote(clientId?: string) {
-  const user = await getCurrentUser();
-  if (clientId && !await prisma.client.findFirst({ where: { id: clientId, archivedAt: null } })) throw new Error("Cliente no disponible.");
+  const { user, workspace } = await requireWorkspaceMembership();
+  if (clientId && !await prisma.client.findFirst({ where: { id: clientId, workspaceId: workspace.id, archivedAt: null } })) throw new Error("Cliente no disponible.");
   const greetingAt = new Date();
   const intakeAt = new Date(greetingAt.getTime() + 1);
 
@@ -45,6 +45,7 @@ async function makeDraftQuote(clientId?: string) {
   const created = await tx.quote.create({
     data: {
       userId: user.id,
+      workspaceId: workspace.id,
       clientId,
       messages: {
         create: [
@@ -54,7 +55,7 @@ async function makeDraftQuote(clientId?: string) {
       },
     },
   });
-  await tx.activityRecord.create({ data: { actorId: user.id, clientId, action: "QUOTE_CREATED", description: `Presupuesto creado: ${created.id.slice(0, 8)}` } });
+  await tx.activityRecord.create({ data: { workspaceId: workspace.id, actorId: user.id, clientId, action: "QUOTE_CREATED", description: `Presupuesto creado: ${created.id.slice(0, 8)}` } });
   return created;
   });
   revalidatePath("/", "layout");
@@ -62,15 +63,13 @@ async function makeDraftQuote(clientId?: string) {
 }
 
 export async function duplicateQuote(quoteId: string) {
-  const user = await getCurrentUser();
-  const source = await prisma.quote.findUniqueOrThrow({
-    where: { id: quoteId },
+  const { user, workspace } = await requireWorkspaceMembership();
+  const source = await prisma.quote.findFirst({
+    where: { id: quoteId, workspaceId: workspace.id },
     include: { lineItems: true, client: true },
   });
 
-  if (source.userId !== user.id) {
-    throw new Error("No autorizado.");
-  }
+  if (!source) throw new Error("Presupuesto no disponible en el workspace actual.");
 
   const introMessage = source.client
     ? `Este presupuesto es una copia de "${source.client.name}". Puedes seguir ajustándolo desde aquí — dime qué quieres cambiar.`
@@ -79,6 +78,7 @@ export async function duplicateQuote(quoteId: string) {
   const duplicate = await prisma.quote.create({
     data: {
       userId: user.id,
+      workspaceId: workspace.id,
       clientId: source.clientId,
       currency: source.currency,
       taxRatePercent: source.taxRatePercent,
@@ -113,24 +113,18 @@ export async function duplicateQuote(quoteId: string) {
 }
 
 export async function deleteQuote(quoteId: string) {
-  const user = await getCurrentUser();
-  const quote = await prisma.quote.findUniqueOrThrow({ where: { id: quoteId } });
-
-  if (quote.userId !== user.id) {
-    throw new Error("No autorizado.");
-  }
+  const { workspace } = await requireWorkspaceAdmin();
+  const quote = await prisma.quote.findFirst({ where: { id: quoteId, workspaceId: workspace.id } });
+  if (!quote) throw new Error("Presupuesto no disponible en el workspace actual.");
 
   await prisma.quote.delete({ where: { id: quoteId } });
   revalidatePath("/", "layout");
 }
 
 export async function updateQuoteStatus(quoteId: string, status: QuoteStatus) {
-  const user = await getCurrentUser();
-  const quote = await prisma.quote.findUniqueOrThrow({ where: { id: quoteId } });
-
-  if (quote.userId !== user.id) {
-    throw new Error("No autorizado.");
-  }
+  const { user, workspace } = await requireWorkspaceMembership();
+  const quote = await prisma.quote.findFirst({ where: { id: quoteId, workspaceId: workspace.id } });
+  if (!quote) throw new Error("Presupuesto no disponible en el workspace actual.");
 
   // Sella la fecha de seguimiento la primera vez que se alcanza ese estado
   // (nunca se sobrescribe en cambios posteriores). Alimenta la tarjeta
@@ -146,19 +140,16 @@ export async function updateQuoteStatus(quoteId: string, status: QuoteStatus) {
   if (!Object.hasOwn(labels, status)) throw new Error("Estado no válido.");
   await prisma.$transaction(async (tx) => {
     await tx.quote.update({ where: { id: quoteId }, data: { status, ...timestamps, statusHistory: { create: { status } } } });
-    await tx.activityRecord.create({ data: { actorId: user.id, clientId: quote.clientId, action: "QUOTE_STATUS_CHANGED", description: `Presupuesto ${quoteId.slice(0, 8)}: ${labels[status]}` } });
+    await tx.activityRecord.create({ data: { workspaceId: workspace.id, actorId: user.id, clientId: quote.clientId, action: "QUOTE_STATUS_CHANGED", description: `Presupuesto ${quoteId.slice(0, 8)}: ${labels[status]}` } });
   });
 
   revalidatePath("/", "layout");
 }
 
 export async function createQuoteNote(quoteId: string, content: string) {
-  const user = await getCurrentUser();
-  const quote = await prisma.quote.findUniqueOrThrow({ where: { id: quoteId } });
-
-  if (quote.userId !== user.id) {
-    throw new Error("No autorizado.");
-  }
+  const { workspace } = await requireWorkspaceMembership();
+  const quote = await prisma.quote.findFirst({ where: { id: quoteId, workspaceId: workspace.id } });
+  if (!quote) throw new Error("Presupuesto no disponible en el workspace actual.");
 
   const note = await prisma.quoteNote.create({ data: { quoteId, content } });
   revalidatePath("/", "layout");
@@ -172,24 +163,18 @@ export async function createQuoteNote(quoteId: string, content: string) {
 }
 
 export async function updateQuoteNote(noteId: string, content: string) {
-  const user = await getCurrentUser();
-  const note = await prisma.quoteNote.findUniqueOrThrow({ where: { id: noteId }, include: { quote: true } });
-
-  if (note.quote.userId !== user.id) {
-    throw new Error("No autorizado.");
-  }
+  const { workspace } = await requireWorkspaceMembership();
+  const note = await prisma.quoteNote.findFirst({ where: { id: noteId, quote: { workspaceId: workspace.id } } });
+  if (!note) throw new Error("Nota no disponible en el workspace actual.");
 
   await prisma.quoteNote.update({ where: { id: noteId }, data: { content } });
   revalidatePath("/", "layout");
 }
 
 export async function deleteQuoteNote(noteId: string) {
-  const user = await getCurrentUser();
-  const note = await prisma.quoteNote.findUniqueOrThrow({ where: { id: noteId }, include: { quote: true } });
-
-  if (note.quote.userId !== user.id) {
-    throw new Error("No autorizado.");
-  }
+  const { workspace } = await requireWorkspaceAdmin();
+  const note = await prisma.quoteNote.findFirst({ where: { id: noteId, quote: { workspaceId: workspace.id } } });
+  if (!note) throw new Error("Nota no disponible en el workspace actual.");
 
   await prisma.quoteNote.delete({ where: { id: noteId } });
   revalidatePath("/", "layout");

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowUpRight, CalendarDays, FolderKanban } from "lucide-react";
-import { getCurrentUser } from "@/lib/current-user";
+import { requireWorkspaceMembership } from "@/lib/workspace-access";
 import { firstNameOf } from "@/lib/names";
 import { prisma } from "@/lib/prisma";
 import RecordedActivity from "@/components/dashboard/RecordedActivity";
@@ -23,27 +23,27 @@ function greetingFor(hour: number) {
 const TEXT_LINK = "text-accent inline-flex items-center gap-1 rounded text-xs font-medium hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40";
 
 export default async function DashboardHome() {
-  const user = await getCurrentUser();
+  const { user, workspace } = await requireWorkspaceMembership();
   const now = new Date();
   const today = startOfDay(now);
   const tomorrow = addDays(today, 1);
   const todayKey = toDateInputValue(today);
   const [events, projects, activity, tasks] = await Promise.all([
     prisma.event.findMany({
-      where: { userId: user.id, startAt: { lt: tomorrow }, endAt: { gt: today } },
+      where: { workspaceId: workspace.id, startAt: { lt: tomorrow }, endAt: { gt: today } },
       orderBy: { startAt: "asc" },
       select: {
         id: true, title: true, type: true, startAt: true, endAt: true,
-        project: { select: { id: true, name: true, userId: true } },
+        project: { select: { id: true, name: true, workspaceId: true } },
         client: { select: { name: true } },
       },
     }),
     prisma.project.findMany({
-      where: { userId: user.id },
+      where: { workspaceId: workspace.id },
       include: { periods: { orderBy: { startDate: "desc" } } },
     }),
-    prisma.activityRecord.findMany({ where: { OR: [{ actorId: user.id }, { project: { userId: user.id } }] }, include: { actor: { select: { displayName: true } } }, orderBy: { createdAt: "desc" }, take: 6 }),
-    prisma.workItem.findMany({ where: { project: { userId: user.id }, completedAt: null, kind: "TASK", dueDate: { lt: new Date(toDateInputValue(tomorrow) + "T00:00:00Z") } }, include: { project: { select: { name: true } }, period: { select: { label: true } } }, orderBy: { dueDate: "asc" } }),
+    prisma.activityRecord.findMany({ where: { workspaceId: workspace.id }, include: { actor: { select: { displayName: true } } }, orderBy: { createdAt: "desc" }, take: 6 }),
+    prisma.workItem.findMany({ where: { workspaceId: workspace.id, completedAt: null, kind: "TASK", dueDate: { lt: new Date(toDateInputValue(tomorrow) + "T00:00:00Z") } }, include: { project: { select: { name: true } }, period: { select: { label: true } } }, orderBy: { dueDate: "asc" } }),
   ]);
   const operationalProjects = projects.filter(isActiveProject).map((p) => {
     if (p.kind !== "RECURRING") return p;
@@ -89,7 +89,7 @@ export default async function DashboardHome() {
             ) : (
               <ul className="divide-surface-border divide-y">
                 {events.map((event) => {
-                  const project = event.project?.userId === user.id ? event.project : null;
+                  const project = event.project?.workspaceId === workspace.id ? event.project : null;
                   return (
                     <li key={event.id} className="flex gap-3 py-3.5">
                       <span className="text-muted-foreground w-16 shrink-0 pt-0.5 text-xs tabular-nums">

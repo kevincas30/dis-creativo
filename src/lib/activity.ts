@@ -15,18 +15,18 @@ export type ActivityEventData = {
   at: string;
 };
 
-export async function getRecentActivity(userId: string, limit: number): Promise<ActivityEventData[]> {
+export async function getRecentActivity(workspaceId: string, limit: number): Promise<ActivityEventData[]> {
   const fetchLimit = Math.max(limit, 10);
 
   const [recentQuotes, recentStatusChanges] = await Promise.all([
     prisma.quote.findMany({
-      where: { userId },
+      where: { workspaceId },
       include: { client: true },
       orderBy: { createdAt: "desc" },
       take: fetchLimit,
     }),
     prisma.quoteStatusHistory.findMany({
-      where: { quote: { userId } },
+      where: { quote: { workspaceId } },
       include: { quote: { include: { client: true } } },
       orderBy: { changedAt: "desc" },
       take: fetchLimit,
