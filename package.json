@@ -6,8 +6,12 @@
     "dev": "next dev",
     "build": "prisma generate && next build",
     "test:integration": "tsx tests/project-work.integration.ts",
+    "test:backfill": "tsx tests/workspace-backfill.integration.ts",
     "test:workspace": "tsx --test src/lib/workspace-access.test.ts src/lib/workspace-bootstrap.test.ts",
     "bootstrap:workspace": "tsx scripts/bootstrap-workspace.ts",
+    "backfill:workspace": "tsx scripts/backfill-workspace.ts",
+    "validate:workspace-backfill": "tsx scripts/validate-workspace-backfill.ts",
+    "snapshot:business": "tsx scripts/export-business-snapshot.ts",
     "start": "next start",
     "lint": "eslint"
   },

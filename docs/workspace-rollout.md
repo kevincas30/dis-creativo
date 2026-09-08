@@ -1,75 +1,125 @@
 # Despliegue de workspace y autorización
 
-Este procedimiento aplica la Fase 0 sobre una base real. No debe ejecutarse desde desarrollo sin una ventana de mantenimiento, un backup restaurable y una persona responsable de validar cada punto. No contiene contraseñas, tokens ni cadenas de conexión.
+Este procedimiento aplica la Fase 0 a la base real. La propietaria ha aceptado
+un snapshot lógico ligero como medida de emergencia: no es una restauración
+completa de Supabase. Los datos operativos se recuperarán por *best effort*,
+con prioridad absoluta para Servicios, reglas de precios y reglas de descuento.
 
-## 1. Activar mantenimiento o detener escrituras
+No ejecutar ningún paso sin una ventana de mantenimiento y revisión humana de
+los resultados. No guardar contraseñas, tokens ni conexiones en el repositorio.
 
-Bloquear inicios de flujos que creen o modifiquen datos: clientes, presupuestos, proyectos, tareas, eventos y pagos. Confirmar que no quedan procesos de escritura en curso.
+## 1. Detener escrituras
 
-**Recuperación:** si todavía no se aplicó una migración ni se escribió dato alguno, retirar mantenimiento y volver a operar con la versión vigente. Si ya hubo cambios, mantener el bloqueo hasta decidir entre continuar o restaurar el backup validado.
+Activar mantenimiento o bloquear temporalmente altas y cambios de clientes,
+presupuestos, proyectos, tareas, eventos y pagos. Esperar a que finalicen las
+operaciones que ya estén en curso.
 
-## 2. Crear y verificar un backup restaurable
+**Recuperación:** si todavía no se aplicó ningún cambio de datos, retirar
+mantenimiento y continuar con la versión vigente.
 
-Crear un backup lógico con acceso al esquema de aplicación y, si el mecanismo lo permite, al esquema `auth`. Restaurarlo en una base aislada y comparar esquema y conteos básicos antes de continuar. Registrar la hora, identificador y resultado de la restauración.
+## 2. Crear y verificar el snapshot ligero
 
-**Recuperación:** no seguir si la restauración no es verificable. Mantener mantenimiento, corregir permisos o mecanismo de backup y crear uno nuevo.
+Crear un snapshot con `npm run snapshot:business -- --output-dir
+/Users/kevincastillo/Backups/diseno-creativo` y conservar la carpeta con
+permisos privados fuera del repositorio. Verificar JSON, checksum, conteos y
+que el catálogo incluye todos los servicios, precios y descuentos. Registrar
+ruta, checksum y conteos antes de seguir.
+
+Esta copia no sustituye un backup físico restaurable. Sirve para recuperar por
+*best effort* los datos del dominio, especialmente el catálogo.
+
+**Recuperación:** si falla la exportación, los conteos no coinciden o el catálogo
+no está completo, no avanzar. Corregir la causa y crear un snapshot nuevo.
 
 ## 3. Aplicar la migración aditiva
 
-Aplicar exclusivamente la migración de Fase 0A que crea `Workspace`, `WorkspaceMember` y las columnas opcionales `workspaceId`. Verificar que no aplica restricciones contractivas, RLS, backfill ni cambios de roles de PostgreSQL.
+Aplicar exclusivamente la migración de Fase 0A para `Workspace`,
+`WorkspaceMember` y las columnas nullable `workspaceId`. No aplicar todavía
+RLS, `NOT NULL`, restricciones compuestas, backfill ni cambios contractivos.
 
-**Recuperación:** la migración es aditiva. Si falla antes de completarse, mantener mantenimiento y restaurar la base aislada o producción desde el backup según el estado confirmado. Si termina pero el siguiente paso se bloquea, conservar las columnas nullable y volver temporalmente al código anterior; no borrar tablas ni columnas manualmente.
+**Recuperación:** la migración es aditiva. Si falla, mantener mantenimiento y
+volver al código vigente. No borrar columnas ni tablas manualmente.
 
-## 4. Crear el workspace “Diseño Creativo”
+## 4. Crear el workspace y su única membresía inicial
 
-Ejecutar el bootstrap parametrizable con el nombre `Diseño Creativo`, primero en modo `--dry-run` y después dentro de su transacción. Confirmar el ID resultante del workspace y que sólo se creó o reutilizó ese workspace.
+Ejecutar primero el bootstrap con `--dry-run`. Después crear o reutilizar
+`Diseño Creativo` y añadir únicamente
+`kevincastillo3001@outlook.com:ADMIN`. No añadir la cuenta Gmail de prueba. Los
+otros miembros se incorporarán más adelante.
 
-**Recuperación:** si el dry-run no coincide con lo esperado, no ejecutar el modo de escritura. Si el bootstrap falla, su transacción debe revertir; inspeccionar el estado antes de reintentarlo. Si queda un workspace creado sin datos asociados, restaurar desde backup o corregir mediante una operación revisada, nunca con borrados improvisados.
+**Recuperación:** si el dry-run no coincide con lo esperado, no ejecutar el
+bootstrap. Si se añade una membresía equivocada, mantener mantenimiento y
+corregir sólo esa membresía mediante una operación revisada; no modificar Auth.
 
-## 5. Añadir únicamente el administrador inicial
+## 5. Ensayar el backfill sin escribir
 
-Añadir `kevincastillo3001@outlook.com` como miembro con rol `ADMIN`. Verificar que el correo corresponde a un usuario existente en `public.users` y `auth.users`. No añadir la cuenta Gmail de prueba.
+Usar el ID o el nombre del workspace y ejecutar:
 
-**Recuperación:** si se asigna un usuario equivocado, mantener mantenimiento y corregir únicamente la membresía errónea mediante una transacción revisada. No modificar ni desactivar cuentas de Auth. Si no puede demostrarse el estado previo, restaurar el backup validado.
+```sh
+npm run backfill:workspace -- --workspace-name "Diseño Creativo" --dry-run
+```
 
-## 6. Confirmar que no se añadió la cuenta Gmail de prueba
+Revisar los conteos por entidad raíz y confirmar que no informa conflictos. El
+script sólo puede asignar filas con `workspaceId = NULL`; nunca reemplaza el
+workspace de filas ya asignadas.
 
-Consultar las membresías del workspace y verificar que sólo está la cuenta Outlook indicada en el paso anterior. Los otros miembros se incorporarán después mediante el bootstrap o una operación administrativa futura.
+**Recuperación:** un conflicto cancela el proceso sin cambios. Investigar las
+relaciones informadas y no continuar hasta resolverlas.
 
-**Recuperación:** si aparece la cuenta de prueba, retirarla de la membresía antes de cualquier backfill. Si existen dudas sobre qué datos pudo consultar, mantener mantenimiento e investigar antes de reabrir la aplicación.
+## 6. Ejecutar el backfill real
 
-## 7. Ejecutar el backfill de datos históricos
+Ejecutar una sola vez, dentro de mantenimiento:
 
-Asignar el `workspaceId` de Diseño Creativo a todas las entidades raíz históricas: clientes, servicios, presupuestos, proyectos, tareas, eventos y actividad. Las entidades hijas conservan el ámbito de su padre. No renombrar `userId`, no cambiar `Project.client` y no eliminar el presupuesto de prueba conocido.
+```sh
+npm run backfill:workspace -- --workspace-name "Diseño Creativo"
+```
 
-**Recuperación:** ejecutar el backfill en transacciones por lote con registro de conteos. Ante un fallo, detener el proceso y restaurar el backup si no se puede identificar con precisión qué lotes se aplicaron. No activar el código de Fase 0B contra una base parcialmente rellenada.
+El script trabaja en una transacción, actualiza solamente Client, Service,
+Quote, Project, WorkItem, Event y ActivityRecord sin workspace, y verifica
+relaciones de entidades hijas antes y después. No borra, archiva, recrea ni
+renombra registros.
 
-## 8. Validar datos antes del despliegue
+**Recuperación:** si falla, la transacción revierte. Mantener mantenimiento,
+conservar el snapshot y resolver la causa antes de reintentar. Como no hay
+backup restaurable completo, no continuar con una base parcialmente modificada.
 
-Comparar conteos previos y posteriores, validar relaciones y confirmar que no quedan entidades raíz operativas con `workspaceId = NULL`. Revisar específicamente clientes, servicios, presupuestos, proyectos, tareas, eventos y actividad; validar también que las entidades hijas pertenecen a su presupuesto o proyecto padre.
+## 7. Validar contra el snapshot
 
-**Recuperación:** ante conteos, relaciones o nulos inesperados, mantener mantenimiento, detener el despliegue y restaurar el backup o repetir el backfill sólo desde un estado verificable.
+Ejecutar la validación con la ruta exacta del snapshot aprobado:
 
-## 9. Desplegar el código con autorización de workspace
+```sh
+npm run validate:workspace-backfill -- \
+  --workspace-name "Diseño Creativo" \
+  --snapshot "/Users/kevincastillo/Backups/diseno-creativo/<fecha>/business-snapshot.json" \
+  --admin-email "kevincastillo3001@outlook.com" \
+  --excluded-email "kevincas3008@gmail.com"
+```
 
-Desplegar la versión que filtra raíces por `workspaceId`, conserva `userId` como creador histórico y no usa fallback global para valores NULL. Confirmar que las variables de entorno y la conexión de Prisma no cambian rol ni RLS.
+Debe confirmar que Outlook es `ADMIN`, Gmail no tiene membresía, no quedan
+raíces con `workspaceId = NULL`, los IDs y conteos coinciden con el snapshot,
+no hay relaciones huérfanas y el catálogo conserva servicios, reglas de precio
+y reglas de descuento. El inventario de referencia actual es 41 servicios y 77
+reglas de precio; si el snapshot aprobado contiene otro número, ese valor es la
+referencia válida.
 
-**Recuperación:** si el despliegue falla antes de aceptar tráfico, revertir la versión de aplicación y mantener la migración aditiva. Si falla después, volver a la versión anterior sólo si el mantenimiento sigue activo y los datos ya tienen backfill completo; de lo contrario restaurar el backup validado.
+**Recuperación:** si falla una comprobación, mantener mantenimiento. Usar el
+snapshot para reconstrucción por *best effort* sólo después de determinar la
+causa; no desplegar Fase 0B.
 
-## 10. Ejecutar smoke tests autenticados
+## 8. Desplegar Fase 0B y hacer smoke tests
 
-Con el administrador inicial, comprobar lectura y creación de cliente, presupuesto, proyecto, tarea, evento y pago; comprobar PDF y chat. Probar que una cuenta sin membresía recibe acceso denegado y que un miembro posterior puede ver datos del workspace compartido. No usar datos reales para ensayos destructivos.
+Desplegar el commit que limita los datos por workspace. Con Outlook, comprobar
+lectura y creación de cliente, presupuesto, proyecto, tarea, evento y pago,
+más chat y PDF. Confirmar que una cuenta sin membresía recibe acceso denegado.
 
-**Recuperación:** si falla un smoke test, volver a mantenimiento, recopilar el error sin exponer secretos y revertir la aplicación o restaurar el backup según si el problema es sólo código o también datos.
+**Recuperación:** si los smoke tests fallan, volver a mantenimiento y revertir
+la versión de aplicación. No aplicar restricciones contractivas mientras haya
+incertidumbre sobre datos.
 
-## 11. Desactivar mantenimiento
+## 9. Retirar mantenimiento y aplazar restricciones contractivas
 
-Retirar el bloqueo únicamente cuando los smoke tests, conteos y relaciones hayan sido aceptados. Monitorizar errores de autorización y de registros con `workspaceId` durante la primera ventana operativa.
+Reabrir escrituras sólo después de aceptar validación y smoke tests. Observar
+los errores de autorización y los intentos de crear raíces sin `workspaceId`.
 
-**Recuperación:** si aparecen errores de acceso o datos fuera de ámbito, reactivar mantenimiento inmediatamente, conservar evidencias y aplicar el rollback definido en los pasos 7 a 10.
-
-## 12. Reservar restricciones contractivas para una fase posterior
-
-No aplicar todavía `NOT NULL`, claves foráneas compuestas, eliminación de campos legados ni RLS funcional. Planificar esa fase después de observar el sistema y confirmar la ausencia sostenida de raíces con `workspaceId = NULL`.
-
-**Recuperación:** al no aplicar cambios contractivos en esta fase, se conserva la opción de volver temporalmente a código compatible. Las restricciones futuras deben tener su propio backup, ensayo de restauración y plan de rollback.
+Una fase posterior podrá aplicar `NOT NULL`, claves compuestas y RLS. Esa fase
+necesita su propio plan de recuperación; no se incluye en este despliegue.
