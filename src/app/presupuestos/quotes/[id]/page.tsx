@@ -1,46 +1,11 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireWorkspaceMembership } from "@/lib/workspace-access";
-import { serializeQuote } from "@/lib/quote-presenter";
-import QuoteWorkspace from "@/components/quotes/QuoteWorkspace";
+import QuoteEditor from "@/components/quotes/QuoteEditor";
 
-export default async function QuotePage({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ id: string }>;
-  searchParams: Promise<{ new?: string }>;
-}) {
-  const { id } = await params;
-  const { new: isNewParam } = await searchParams;
-  const { workspace } = await requireWorkspaceMembership();
-
-  const quote = await prisma.quote.findFirst({
-    where: { id, workspaceId: workspace.id },
-    include: {
-      client: true,
-      lineItems: { orderBy: { sortOrder: "asc" } },
-      messages: { orderBy: { createdAt: "asc" } },
-      notes: true,
-    },
-  });
-
-  if (!quote) {
-    notFound();
-  }
-
-  const initialMessages = quote.messages.map((message) => ({
-    role: (message.role === "assistant" ? "assistant" : "user") as "user" | "assistant",
-    content: message.content,
-    createdAt: message.createdAt.toISOString(),
-  }));
-
-  return (
-    <QuoteWorkspace
-      quoteId={quote.id}
-      initialMessages={initialMessages}
-      initialQuote={serializeQuote(quote)}
-      isNew={isNewParam === "1"}
-    />
-  );
+export default async function QuotePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params; const { workspace } = await requireWorkspaceMembership();
+  const [quote, contacts, services, members] = await Promise.all([prisma.quote.findFirst({ where: { id, workspaceId: workspace.id }, include: { lineItems: { orderBy: { sortOrder: "asc" } }, projects: { select: { id: true } } } }), prisma.client.findMany({ where: { workspaceId: workspace.id, archivedAt: null }, select: { id: true, name: true, email: true, phone: true, instagram: true, responsibleId: true, stage: true }, orderBy: { name: "asc" } }), prisma.service.findMany({ where: { workspaceId: workspace.id, isActive: true }, include: { pricingRules: true }, orderBy: { name: "asc" } }), prisma.workspaceMember.findMany({ where: { workspaceId: workspace.id }, include: { user: { select: { id: true, displayName: true } } }, orderBy: { user: { displayName: "asc" } } })]);
+  if (!quote) notFound();
+  return <QuoteEditor initial={{ id: quote.id, clientId: quote.clientId, responsibleId: quote.responsibleId, currency: quote.currency, lines: quote.lineItems.map((line) => ({ serviceId: line.serviceId, description: line.description, quantity: Number(line.quantity), unitPrice: Number(line.unitPrice) })), discountType: quote.discountType, discountValue: quote.discountValue ? Number(quote.discountValue) : null, taxRatePercent: quote.taxRatePercent ? Number(quote.taxRatePercent) : null, deliveryTimeline: quote.deliveryTimeline, salesDescription: quote.salesDescription, termsAndConditions: quote.termsAndConditions, depositKind: quote.depositKind, depositValue: Number(quote.depositValue), status: quote.status, hasProject: quote.projects.length > 0, projectId: quote.projects[0]?.id }} contacts={contacts} services={services.map((service) => ({ id: service.id, name: service.name, description: service.description, prices: service.pricingRules.map((price) => ({ currency: price.currency, price: Number(price.basePrice) })) }))} members={members.map((member) => ({ id: member.user.id, name: member.user.displayName }))} />;
 }

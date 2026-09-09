@@ -53,7 +53,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Proyectos", href: "/projects", icon: FolderKanban, isActive: (p) => p.startsWith("/projects") },
   { label: "Tareas", href: "/tasks", icon: ListChecks, isActive: (p) => p.startsWith("/tasks") },
   {
-    label: "Presupuestos IA",
+    label: "Presupuestos",
     href: "/presupuestos",
     icon: FileText,
     isActive: (p) => p.startsWith("/presupuestos"),

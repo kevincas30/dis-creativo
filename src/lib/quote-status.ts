@@ -2,7 +2,7 @@ import type { QuoteStatus } from "@/generated/prisma/enums";
 
 // Usado por StatusBadge (chat / QuoteDocumentCard) — no incluye PAID a
 // propósito, para no cambiar las opciones que ya ve el chat.
-export const QUOTE_STATUS_ORDER: QuoteStatus[] = ["DRAFT", "SENT", "ACCEPTED", "REJECTED", "ARCHIVED"];
+export const QUOTE_STATUS_ORDER: QuoteStatus[] = ["DRAFT", "READY_TO_SEND", "SENT", "ACCEPTED", "REJECTED", "EXPIRED", "ARCHIVED"];
 
 // Usado por el <select> del panel derecho (QuoteTrackingPanel) — solo el
 // ciclo de vida comercial "feliz": pendiente -> enviado -> aprobado -> pagado.
@@ -25,6 +25,12 @@ export const QUOTE_STATUS_CONFIG: Record<
     badgeClassName: "border-amber-400/20 bg-amber-400/10 text-amber-300",
     badgeSurfaceClassName: "border-amber-400/20 bg-amber-400/10",
   },
+  READY_TO_SEND: {
+    label: "Listo para enviar",
+    dotClassName: "bg-indigo-400",
+    badgeClassName: "border-indigo-400/20 bg-indigo-400/10 text-indigo-300",
+    badgeSurfaceClassName: "border-indigo-400/20 bg-indigo-400/10",
+  },
   SENT: {
     label: "Enviado",
     dotClassName: "bg-blue-500",
@@ -42,6 +48,12 @@ export const QUOTE_STATUS_CONFIG: Record<
     dotClassName: "bg-red-500",
     badgeClassName: "border-red-500/20 bg-red-500/10 text-red-300",
     badgeSurfaceClassName: "border-red-500/20 bg-red-500/10",
+  },
+  EXPIRED: {
+    label: "Vencido",
+    dotClassName: "bg-orange-400",
+    badgeClassName: "border-orange-400/20 bg-orange-400/10 text-orange-300",
+    badgeSurfaceClassName: "border-orange-400/20 bg-orange-400/10",
   },
   ARCHIVED: {
     label: "Archivado",

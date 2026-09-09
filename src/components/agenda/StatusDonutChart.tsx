@@ -10,10 +10,12 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 // `stroke` no puede tomar una clase de Tailwind.
 const STROKE_HEX: Record<QuoteStatus, string> = {
   DRAFT: "#fbbf24",
+  READY_TO_SEND: "#818cf8",
   SENT: "#60a5fa",
   ACCEPTED: "#34d399",
   PAID: "#22d3ee",
   REJECTED: "#f87171",
+  EXPIRED: "#fb923c",
   ARCHIVED: "#a1a1aa",
 };
 

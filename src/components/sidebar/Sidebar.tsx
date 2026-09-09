@@ -93,7 +93,7 @@ export default function Sidebar({ quotes, user }: { quotes: SidebarQuote[]; user
           </form>
 
           <Link
-            href="/presupuestos/agenda"
+            href="/agenda"
             onClick={stopPropagation}
             aria-label="Agenda"
             className="liquid-glass focus-visible:ring-accent/40 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-foreground transition-all duration-200 ease-out hover:-translate-y-px active:translate-y-0 active:scale-[0.9] focus-visible:ring-2 focus-visible:outline-none"
@@ -143,7 +143,7 @@ export default function Sidebar({ quotes, user }: { quotes: SidebarQuote[]; user
               </Button>
             </form>
             <Link
-              href="/presupuestos/agenda"
+              href="/agenda"
               className="liquid-glass focus-visible:ring-accent/40 flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium text-foreground transition-all duration-200 ease-out hover:-translate-y-px active:translate-y-0 active:scale-[0.97] focus-visible:ring-2 focus-visible:outline-none"
               style={AGENDA_GLASS_VARS}
             >

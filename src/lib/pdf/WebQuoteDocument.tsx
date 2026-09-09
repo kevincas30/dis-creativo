@@ -113,9 +113,8 @@ export default function WebQuoteDocument({ quote, logoSquare }: { quote: QuotePd
   const projectTitle = primaryItem?.serviceName ?? primaryItem?.description ?? "Sitio web";
   const footerLabel = `${quote.client?.company ?? quote.client?.name ?? "Diseño Creativo"} — Presupuesto Web`;
 
-  const anticipo = Math.round(quote.total * 0.4 * 100) / 100;
-  const intermedio = Math.round(quote.total * 0.3 * 100) / 100;
-  const entrega = Math.round((quote.total - anticipo - intermedio) * 100) / 100;
+  const anticipo = quote.depositKind === "NONE" ? 0 : quote.depositKind === "FULL" ? quote.total : quote.depositKind === "FIXED" ? Math.min(quote.total, quote.depositValue) : Math.round(quote.total * quote.depositValue / 100) / 100;
+  const entrega = Math.round((quote.total - anticipo) * 100) / 100;
 
   const summaryParagraphs = (details?.summary ?? "").split(/\n{2,}/).filter((p) => p.trim());
   const hasMenuStructure = (details?.menuStructure.length ?? 0) > 0;
@@ -230,19 +229,14 @@ export default function WebQuoteDocument({ quote, logoSquare }: { quote: QuotePd
     content: (
       <>
         <Text style={styles.paragraph}>
-          La forma de pago se estructura bajo la modalidad de hitos por avance (40% / 30% / 30%), distribuidos de
-          la siguiente manera sobre el total de desarrollo (<Text style={styles.bold}>{formatMoney(quote.total, quote.currency)}</Text>):
+          La forma de pago se estructura según el anticipo acordado, sobre el total de desarrollo (<Text style={styles.bold}>{formatMoney(quote.total, quote.currency)}</Text>):
         </Text>
         <Milestone>
-          <Text style={styles.bold}>40% Anticipo Inicial ({formatMoney(anticipo, quote.currency)}):</Text> al
+          <Text style={styles.bold}>Anticipo inicial ({formatMoney(anticipo, quote.currency)}):</Text> al
           iniciar el proyecto.
         </Milestone>
         <Milestone>
-          <Text style={styles.bold}>30% Pago Intermedio ({formatMoney(intermedio, quote.currency)}):</Text> al
-          completar la maquetación y estructura base del sitio.
-        </Milestone>
-        <Milestone>
-          <Text style={styles.bold}>30% Pago Contra Entrega ({formatMoney(entrega, quote.currency)}):</Text> tras
+          <Text style={styles.bold}>Saldo contra entrega ({formatMoney(entrega, quote.currency)}):</Text> tras
           la puesta en marcha definitiva y entrega de accesos.
         </Milestone>
         <Milestone>

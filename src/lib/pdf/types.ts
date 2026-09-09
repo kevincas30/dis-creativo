@@ -11,6 +11,8 @@ export type QuotePdfData = {
   discountValue: number | null;
   taxAmount: number;
   total: number;
+  depositKind: "PERCENTAGE" | "FIXED" | "FULL" | "NONE";
+  depositValue: number;
   salesDescription: string | null;
   deliveryTimeline: string | null;
   client: {

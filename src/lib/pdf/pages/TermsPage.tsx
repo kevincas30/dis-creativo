@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import { Page, View, Text, Image, StyleSheet } from "@react-pdf/renderer";
 import { INK, MUTED, LINE } from "@/lib/pdf/colors";
 import { TITLE_FONT_FAMILY } from "@/lib/pdf/fonts";
+import type { QuotePdfData } from "@/lib/pdf/types";
+import { formatMoney } from "@/lib/pdf/format";
 
 const styles = StyleSheet.create({
   page: {
@@ -44,7 +46,9 @@ function Bullet({ children }: { children: ReactNode }) {
   );
 }
 
-export default function TermsPage({ logoSquare, signature }: { logoSquare: Buffer; signature: Buffer }) {
+export default function TermsPage({ quote, logoSquare, signature }: { quote: QuotePdfData; logoSquare: Buffer; signature: Buffer }) {
+  const amount = quote.depositKind === "NONE" ? 0 : quote.depositKind === "FULL" ? quote.total : quote.depositKind === "FIXED" ? Math.min(quote.total, quote.depositValue) : quote.total * quote.depositValue / 100;
+  const label = quote.depositKind === "NONE" ? "No se requiere anticipo" : quote.depositKind === "FULL" ? "Se requiere pago completo" : quote.depositKind === "FIXED" ? "Se requiere un anticipo fijo" : `Se requiere un anticipo del ${quote.depositValue}%`;
   return (
     <Page size="A4" style={styles.page}>
       <View style={styles.headerRow}>
@@ -71,7 +75,7 @@ export default function TermsPage({ logoSquare, signature }: { logoSquare: Buffe
         Este presupuesto tiene una validez de <Text style={styles.bold}>15 días naturales</Text>.
       </Bullet>
       <Bullet>
-        Se requiere un <Text style={styles.bold}>50% de anticipo</Text> para iniciar el proyecto.
+        <Text style={styles.bold}>{label} ({formatMoney(amount, quote.currency)})</Text> para iniciar el proyecto.
       </Bullet>
       <Bullet>El saldo restante se liquida antes de la entrega final.</Bullet>
       <Bullet>

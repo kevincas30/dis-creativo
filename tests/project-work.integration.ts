@@ -118,11 +118,6 @@ async function main() {
     assert.equal(converted.payments[0].periodId, convertedPeriod); assert.equal(converted.workItems[0].periodId, convertedPeriod);
     assert.ok(converted.assignments.some((a) => a.periodId === null)); assert.ok(converted.assignments.some((a) => a.periodId === convertedPeriod));
     check("explicit one-off conversion preserves current state, dates, payment, tasks and default team in its first period");
-    await assert.rejects(db.payment.create({ data: { id: randomUUID(), requestId: randomUUID(), projectId: "monthly", amount: "1", currency: "EUR", paidAt: new Date(), recordedById: "owner" } }));
-    await assert.rejects(db.payment.create({ data: { id: randomUUID(), requestId: randomUUID(), projectId: "one", periodId: first, amount: "1", currency: "EUR", paidAt: new Date(), recordedById: "owner" } }));
-    await assert.rejects(db.projectPeriod.delete({ where: { id: first } }));
-    await assert.rejects(db.client.delete({ where: { id: "client" } }));
-    check("database constraints reject wrong payment scope and deletion of referenced records");
     const counts = [await db.project.count(), await db.projectPeriod.count(), await db.payment.count(), await db.quote.count(), await db.workItem.count()];
     await assert.rejects(archiveClientRecord(db, memberActor, "client", true), /administrador/);
     const assignment = await db.workAssignment.findFirstOrThrow({ where: { projectId: "monthly", periodId: first } });
@@ -143,6 +138,11 @@ async function main() {
     assert.equal(financialSummary(null, ["10.00"], null, "2026-01-01").outstanding, null);
     assert.equal(financialSummary("10", ["12.30"], null, "2026-01-01").credit, "2.30");
     check("month-end/leap-year dates, unknown totals and overpayment credit");
+    await assert.rejects(db.payment.create({ data: { id: randomUUID(), requestId: randomUUID(), projectId: "monthly", amount: "1", currency: "EUR", paidAt: new Date(), recordedById: "owner" } }));
+    await assert.rejects(db.payment.create({ data: { id: randomUUID(), requestId: randomUUID(), projectId: "one", periodId: first, amount: "1", currency: "EUR", paidAt: new Date(), recordedById: "owner" } }));
+    await assert.rejects(db.projectPeriod.delete({ where: { id: first } }));
+    await assert.rejects(db.client.delete({ where: { id: "client" } }));
+    check("database constraints reject wrong payment scope and deletion of referenced records");
     console.log(`${checks} integration groups passed across ${migrations.length} migrations. No external database used.`);
   } finally { await db.$disconnect(); await server.stop(); await pg.close(); }
 }

@@ -88,6 +88,8 @@ export default function ProposalPage({ quote, logoSquare }: { quote: QuotePdfDat
       : quote.discountType === "FIXED"
         ? "Descuento"
         : null;
+  const depositAmount = quote.depositKind === "NONE" ? 0 : quote.depositKind === "FULL" ? quote.total : quote.depositKind === "FIXED" ? Math.min(quote.total, quote.depositValue) : quote.total * quote.depositValue / 100;
+  const depositLabel = quote.depositKind === "NONE" ? "Sin anticipo" : quote.depositKind === "FULL" ? "Pago completo" : quote.depositKind === "FIXED" ? "Anticipo fijo" : `${quote.depositValue}% de anticipo`;
 
   return (
     <Page size="A4" style={styles.page}>
@@ -168,7 +170,7 @@ export default function ProposalPage({ quote, logoSquare }: { quote: QuotePdfDat
       <View style={styles.footerBlock}>
         <View style={styles.footerRow}>
           <Text style={styles.footerLabel}>Forma de pago</Text>
-          <Text style={styles.footerValue}>50% de anticipo · 50% contra entrega</Text>
+          <Text style={styles.footerValue}>{depositLabel}: {formatMoney(depositAmount, quote.currency)} · Saldo: {formatMoney(quote.total - depositAmount, quote.currency)}</Text>
         </View>
         <View style={styles.footerRow}>
           <Text style={styles.footerLabel}>Tiempo estimado de entrega</Text>

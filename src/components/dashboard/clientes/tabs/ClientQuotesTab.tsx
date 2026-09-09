@@ -6,9 +6,11 @@ import type { QuoteStatus } from "@/generated/prisma/enums";
 // a propósito, para no acoplar el módulo Clientes a estilos de Presupuestos IA.
 const QUOTE_STATUS_LABELS: Record<QuoteStatus, { label: string; className: string }> = {
   DRAFT: { label: "Pendiente", className: "border-amber-400/30 bg-amber-400/10 text-amber-300" },
+  READY_TO_SEND: { label: "Listo para enviar", className: "border-indigo-400/30 bg-indigo-400/10 text-indigo-300" },
   SENT: { label: "Enviado", className: "border-blue-400/30 bg-blue-400/10 text-blue-300" },
   ACCEPTED: { label: "Aprobado", className: "border-emerald-400/30 bg-emerald-400/10 text-emerald-300" },
   REJECTED: { label: "Rechazado", className: "border-red-400/30 bg-red-400/10 text-red-300" },
+  EXPIRED: { label: "Vencido", className: "border-orange-400/30 bg-orange-400/10 text-orange-300" },
   ARCHIVED: { label: "Archivado", className: "border-zinc-400/30 bg-zinc-400/10 text-zinc-300" },
   PAID: { label: "Pagado", className: "border-violet-400/30 bg-violet-400/10 text-violet-300" },
 };

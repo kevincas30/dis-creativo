@@ -43,6 +43,8 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/quotes/[id]
     discountValue: quote.discountValue ? Number(quote.discountValue) : null,
     taxAmount: Number(quote.taxAmount),
     total: Number(quote.total),
+    depositKind: quote.depositKind,
+    depositValue: Number(quote.depositValue),
     salesDescription: quote.salesDescription,
     deliveryTimeline: quote.deliveryTimeline,
     client: quote.client ? { name: quote.client.name, company: quote.client.company } : null,

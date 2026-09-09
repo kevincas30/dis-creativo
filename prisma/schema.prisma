@@ -17,11 +17,20 @@ enum Currency {
 
 enum QuoteStatus {
   DRAFT
+  READY_TO_SEND
   SENT
   ACCEPTED
   REJECTED
+  EXPIRED
   ARCHIVED
   PAID
+}
+
+enum DepositKind {
+  PERCENTAGE
+  FIXED
+  FULL
+  NONE
 }
 
 enum DiscountType {
@@ -129,7 +138,9 @@ model User {
   recordedPayments   Payment[]
   activityRecords    ActivityRecord[]
   workspaceMembers   WorkspaceMember[]
-  responsibleClients Client[]          @relation("ClientResponsible")
+  responsibleClients Client[]             @relation("ClientResponsible")
+  responsibleQuotes  Quote[]              @relation("QuoteResponsible")
+  quoteStatusChanges QuoteStatusHistory[] @relation("QuoteStatusChangedBy")
 
   @@map("users")
 }
@@ -285,13 +296,15 @@ model PricingRule {
 /// completando incrementalmente; guarda el resultado final, la explicación del
 /// cálculo y el copy de venta que se incluyen en el PDF (PRD 4, 8 y 10).
 model Quote {
-  id          String     @id @default(uuid())
-  workspaceId String?
-  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
-  userId      String
-  user        User       @relation(fields: [userId], references: [id])
-  clientId    String?
-  client      Client?    @relation(fields: [clientId], references: [id])
+  id            String     @id @default(uuid())
+  workspaceId   String?
+  workspace     Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  userId        String
+  user          User       @relation(fields: [userId], references: [id])
+  clientId      String?
+  client        Client?    @relation(fields: [clientId], references: [id])
+  responsibleId String?
+  responsible   User?      @relation("QuoteResponsible", fields: [responsibleId], references: [id], onDelete: Restrict)
 
   /// Nulos hasta que la IA los determina vía set_client (a partir del país).
   currency       Currency?
@@ -307,6 +320,9 @@ model Quote {
   discountReason String?
   taxAmount      Decimal       @default(0) @db.Decimal(10, 2)
   total          Decimal       @default(0) @db.Decimal(10, 2)
+  depositKind    DepositKind   @default(PERCENTAGE)
+  /// Valor editable del anticipo: porcentaje, importe fijo, total o cero según depositKind.
+  depositValue   Decimal       @default(50) @db.Decimal(10, 2)
 
   /// Explicación en lenguaje claro de cómo se calculó el precio (uso interno / opcional en PDF).
   calculationExplanation String? @db.Text
@@ -339,6 +355,7 @@ model Quote {
   statusHistory QuoteStatusHistory[]
   messages      ConversationMessage[]
   notes         QuoteNote[]
+  events        Event[]
 
   @@index([workspaceId])
   @@map("quotes")
@@ -396,12 +413,14 @@ model QuoteLineItem {
 
 /// Auditoría de cambios de estado de un presupuesto (Borrador -> Enviado -> Aceptado/Rechazado).
 model QuoteStatusHistory {
-  id        String      @id @default(uuid())
-  quoteId   String
-  quote     Quote       @relation(fields: [quoteId], references: [id], onDelete: Cascade)
-  status    QuoteStatus
-  note      String?
-  changedAt DateTime    @default(now())
+  id          String      @id @default(uuid())
+  quoteId     String
+  quote       Quote       @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  status      QuoteStatus
+  note        String?
+  changedAt   DateTime    @default(now())
+  changedById String?
+  changedBy   User?       @relation("QuoteStatusChangedBy", fields: [changedById], references: [id], onDelete: Restrict)
 
   @@map("quote_status_history")
 }
@@ -468,6 +487,8 @@ model Event {
   clientId          String?
   client            Client?        @relation("ClientEvents", fields: [clientId], references: [id], onDelete: SetNull)
   followUpForClient Client?        @relation("ClientFollowUp")
+  quoteId           String?
+  quote             Quote?         @relation(fields: [quoteId], references: [id], onDelete: SetNull)
   periodId          String?
   period            ProjectPeriod? @relation(fields: [periodId], references: [id], onDelete: Restrict)
   projectId         String?
@@ -476,6 +497,7 @@ model Event {
   updatedAt         DateTime       @updatedAt
 
   @@index([workspaceId])
+  @@index([quoteId])
   @@map("events")
 }
 

@@ -6,10 +6,12 @@ import type { ActivityEventData } from "@/lib/activity";
 const EVENT_CONFIG: Record<ActivityEventData["type"], { label: string; icon: LucideIcon }> = {
   created: { label: "Presupuesto creado", icon: FileText },
   DRAFT: { label: "Marcado como pendiente", icon: FileText },
+  READY_TO_SEND: { label: "Listo para enviar", icon: FileText },
   SENT: { label: "Enviado", icon: Send },
   ACCEPTED: { label: "Aprobado", icon: CheckCircle2 },
   PAID: { label: "Pagado", icon: Banknote },
   REJECTED: { label: "Rechazado", icon: XCircle },
+  EXPIRED: { label: "Vencido", icon: XCircle },
   ARCHIVED: { label: "Archivado", icon: Archive },
 };
 

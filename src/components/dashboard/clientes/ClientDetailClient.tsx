@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Mail, Phone, MapPin, Globe, Pencil, X, FolderPlus, CalendarPlus, UserRoundCheck } from "lucide-react";
+import { ArrowLeft, Mail, Phone, MapPin, Globe, Pencil, X, FolderPlus, CalendarPlus, UserRoundCheck, FileText } from "lucide-react";
 import Button from "@/components/ui/Button";
 import { CLIENT_STATUS_CONFIG } from "@/lib/client-status";
 import { clearClientFollowUp, convertClientToCustomer, saveClientFollowUp, updateClient } from "@/app/(dashboard)/clientes/actions";
@@ -168,6 +168,7 @@ export default function ClientDetailClient({
                 <FolderPlus className="h-4 w-4" strokeWidth={1.75} />
                 Nuevo proyecto
               </Button>
+              <Link href={`/presupuestos/nuevo?clientId=${client.id}`} className="glass text-foreground inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium"><FileText className="h-4 w-4" strokeWidth={1.75} />Preparar presupuesto</Link>
               {client.stage === "PROSPECT" ? <Button type="button" variant="secondary" onClick={() => startTransition(async () => { await convertClientToCustomer(client.id); router.refresh(); })} disabled={isPending}><UserRoundCheck className="h-4 w-4" strokeWidth={1.75} />Convertir en cliente</Button> : null}
               <Button type="button" variant="secondary" onClick={() => setIsEventModalOpen(true)}>
                 <CalendarPlus className="h-4 w-4" strokeWidth={1.75} />

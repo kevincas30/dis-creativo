@@ -5,9 +5,11 @@ import type { ActivityEventData } from "@/lib/activity";
 const EVENT_LABELS: Record<ActivityEventData["type"], string> = {
   created: "Creado",
   DRAFT: "Pendiente",
+  READY_TO_SEND: "Listo para enviar",
   SENT: "Enviado",
   ACCEPTED: "Aprobado",
   REJECTED: "Rechazado",
+  EXPIRED: "Vencido",
   ARCHIVED: "Archivado",
   PAID: "Pagado",
 };
@@ -57,7 +59,7 @@ export default function RecentActivityCard({ events }: { events: ActivityEventDa
       </div>
 
       <div className="mt-2 flex justify-end">
-        <Link href="/presupuestos/agenda" className="text-accent hover:opacity-80 text-xs font-medium transition-opacity">
+        <Link href="/agenda" className="text-accent hover:opacity-80 text-xs font-medium transition-opacity">
           Ver toda la actividad
         </Link>
       </div>

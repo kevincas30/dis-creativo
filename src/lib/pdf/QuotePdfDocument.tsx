@@ -18,7 +18,7 @@ export default function QuotePdfDocument({
     <Document>
       <CoverPage quote={quote} logoWhite={logos.white} />
       <ProposalPage quote={quote} logoSquare={logos.square} />
-      <TermsPage logoSquare={logos.square} signature={logos.signature} />
+      <TermsPage quote={quote} logoSquare={logos.square} signature={logos.signature} />
     </Document>
   );
 }

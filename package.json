@@ -15,7 +15,9 @@
     "validate:workspace-backfill": "tsx scripts/validate-workspace-backfill.ts",
     "snapshot:business": "tsx scripts/export-business-snapshot.ts",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "backfill:quotes-phase2": "tsx scripts/backfill-quote-phase2.ts",
+    "test:quotes": "tsx tests/quote-workflow.integration.ts"
   },
   "dependencies": {
     "@google/genai": "^2.13.0",
