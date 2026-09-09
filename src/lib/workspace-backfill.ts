@@ -4,11 +4,20 @@ import type { collectBusinessSnapshot } from "@/lib/business-snapshot";
 export type BackfillRootName = "clients" | "services" | "quotes" | "projects" | "workItems" | "events" | "activity";
 export type WorkspaceTarget = { workspaceId?: string; workspaceName?: string };
 export type WorkspaceBackfillInput = WorkspaceTarget & { dryRun: boolean };
+export type WorkspaceBackfillTransactionOptions = NonNullable<Prisma.PrismaClientOptions["transactionOptions"]>;
 export type WorkspaceBackfillDatabase = {
-  $transaction: <T>(callback: (transaction: Prisma.TransactionClient) => Promise<T>) => Promise<T>;
+  $transaction: <T>(
+    callback: (transaction: Prisma.TransactionClient) => Promise<T>,
+    options?: WorkspaceBackfillTransactionOptions,
+  ) => Promise<T>;
 };
 export type RootCounts = Record<BackfillRootName, { unassigned: number; target: number; other: number }>;
 export type BackfillIssue = { code: string; count: number };
+
+export const WORKSPACE_BACKFILL_TRANSACTION_OPTIONS = {
+  maxWait: 10_000,
+  timeout: 60_000,
+} as const satisfies WorkspaceBackfillTransactionOptions;
 
 export class WorkspaceBackfillConflictError extends Error {
   constructor(public readonly issues: BackfillIssue[]) {
@@ -64,12 +73,13 @@ async function resolveWorkspace(transaction: Prisma.TransactionClient, input: Wo
 
 export async function getBackfillRootCounts(transaction: Prisma.TransactionClient, workspaceId: string): Promise<RootCounts> {
   const count = async (model: "client" | "service" | "quote" | "project" | "workItem" | "event" | "activityRecord") => {
-    const delegate = transaction[model] as unknown as { count: (args: { where: object }) => Promise<number> };
-    const [unassigned, target, total] = await Promise.all([
-      delegate.count({ where: { workspaceId: null } }),
-      delegate.count({ where: { workspaceId } }),
-      delegate.count({ where: {} }),
-    ]);
+    const delegate = transaction[model] as unknown as {
+      groupBy: (args: { by: ["workspaceId"]; _count: { _all: true } }) => Promise<Array<{ workspaceId: string | null; _count: { _all: number } }>>;
+    };
+    const groups = await delegate.groupBy({ by: ["workspaceId"], _count: { _all: true } });
+    const unassigned = groups.find((group) => group.workspaceId === null)?._count._all ?? 0;
+    const target = groups.find((group) => group.workspaceId === workspaceId)?._count._all ?? 0;
+    const total = groups.reduce((sum, group) => sum + group._count._all, 0);
     return { unassigned, target, other: total - unassigned - target };
   };
   const [clients, services, quotes, projects, workItems, events, activity] = await Promise.all([
@@ -203,7 +213,7 @@ export async function backfillWorkspace(
       after,
       issues,
     };
-  });
+  }, WORKSPACE_BACKFILL_TRANSACTION_OPTIONS);
 }
 
 type BusinessSnapshot = Awaited<ReturnType<typeof collectBusinessSnapshot>>;
@@ -284,5 +294,5 @@ export async function validateWorkspaceBackfill(
       acceptedProjectLinks,
       failures,
     };
-  });
+  }, WORKSPACE_BACKFILL_TRANSACTION_OPTIONS);
 }

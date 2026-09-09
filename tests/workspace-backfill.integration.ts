@@ -4,8 +4,16 @@ import { PGlite } from "@electric-sql/pglite";
 import { PGLiteSocketServer } from "@electric-sql/pglite-socket";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
+import type { Prisma } from "../src/generated/prisma/client";
 import { collectBusinessSnapshot } from "../src/lib/business-snapshot";
-import { WorkspaceBackfillConflictError, backfillWorkspace, validateWorkspaceBackfill } from "../src/lib/workspace-backfill";
+import {
+  WORKSPACE_BACKFILL_TRANSACTION_OPTIONS,
+  WorkspaceBackfillConflictError,
+  backfillWorkspace,
+  type WorkspaceBackfillDatabase,
+  type WorkspaceBackfillTransactionOptions,
+  validateWorkspaceBackfill,
+} from "../src/lib/workspace-backfill";
 
 async function main() {
   const pg = new PGlite();
@@ -14,6 +22,13 @@ async function main() {
   const server = new PGLiteSocketServer({ db: pg, host: "127.0.0.1", port: 0 });
   await server.start();
   const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: `postgresql://postgres@${server.getServerConn()}/postgres`, max: 1 }) });
+  const transactionOptions: Array<WorkspaceBackfillTransactionOptions | undefined> = [];
+  const trackedDatabase: WorkspaceBackfillDatabase = {
+    $transaction<T>(callback: (transaction: Prisma.TransactionClient) => Promise<T>, options?: WorkspaceBackfillTransactionOptions) {
+      transactionOptions.push(options);
+      return db.$transaction(callback, options);
+    },
+  };
   const input = { workspaceName: "Diseño Creativo", dryRun: false };
   try {
     await db.user.createMany({ data: [
@@ -48,24 +63,51 @@ async function main() {
     await db.activityRecord.create({ data: { id: "activity", actorId: "owner", clientId: "client", projectId: "project", periodId: "period", action: "TEST", description: "Created" } });
     const snapshot = await collectBusinessSnapshot(db);
 
-    const dryRun = await backfillWorkspace(db, { ...input, dryRun: true });
+    const dryRun = await backfillWorkspace(trackedDatabase, { ...input, dryRun: true });
     assert.equal(dryRun.before.services.unassigned, 1);
     assert.equal(dryRun.updates, null);
     assert.equal(await db.service.count({ where: { workspaceId: null } }), 1);
-    console.log("✓ dry-run reports root rows without writing");
+    assert.deepEqual(transactionOptions.at(-1), WORKSPACE_BACKFILL_TRANSACTION_OPTIONS);
+    console.log("✓ dry-run reports root rows without writing and uses the configured transaction timeout");
 
-    const first = await backfillWorkspace(db, input);
+    const rollbackDatabase: WorkspaceBackfillDatabase = {
+      $transaction<T>(callback: (transaction: Prisma.TransactionClient) => Promise<T>, options?: WorkspaceBackfillTransactionOptions) {
+        return db.$transaction(async (transaction) => {
+          const failingService = new Proxy(transaction.service, {
+            get(target, property, receiver) {
+              if (property === "updateMany") return async () => { throw new Error("forced service update failure"); };
+              return Reflect.get(target, property, receiver);
+            },
+          });
+          const failingTransaction = new Proxy(transaction, {
+            get(target, property, receiver) {
+              if (property === "service") return failingService;
+              return Reflect.get(target, property, receiver);
+            },
+          }) as Prisma.TransactionClient;
+          return callback(failingTransaction);
+        }, options);
+      },
+    };
+    await assert.rejects(backfillWorkspace(rollbackDatabase, input), /forced service update failure/);
+    assert.equal(await db.client.count({ where: { workspaceId: null } }), 1);
+    assert.equal(await db.service.count({ where: { workspaceId: null } }), 1);
+    assert.equal(await db.pricingRule.count(), 1);
+    assert.equal(await db.discountRule.count(), 1);
+    console.log("✓ a write failure rolls back every prior root update and preserves catalog rules");
+
+    const first = await backfillWorkspace(trackedDatabase, input);
     assert.deepEqual(first.updates, { clients: 1, services: 1, quotes: 1, projects: 1, workItems: 1, events: 1, activity: 1 });
     assert.equal(await db.service.count({ where: { workspaceId: "workspace" } }), 1);
     assert.equal(await db.pricingRule.count(), 1);
     assert.equal(await db.discountRule.count(), 1);
     console.log("✓ normal run scopes every root and preserves catalog rules");
 
-    const second = await backfillWorkspace(db, input);
+    const second = await backfillWorkspace(trackedDatabase, input);
     assert.deepEqual(second.updates, { clients: 0, services: 0, quotes: 0, projects: 0, workItems: 0, events: 0, activity: 0 });
     console.log("✓ second run is idempotent");
 
-    const validation = await validateWorkspaceBackfill(db, { ...input, snapshot, adminEmail: "owner@example.test", excludedEmail: "gmail@example.test" });
+    const validation = await validateWorkspaceBackfill(trackedDatabase, { ...input, snapshot, adminEmail: "owner@example.test", excludedEmail: "gmail@example.test" });
     assert.equal(validation.ok, true);
     assert.equal(validation.catalog.services, 1);
     assert.equal(validation.catalog.pricingRules, 1);
@@ -76,7 +118,7 @@ async function main() {
     await db.workspace.create({ data: { id: "foreign-workspace", name: "Foreign" } });
     await db.client.create({ data: { id: "foreign-client", workspaceId: "foreign-workspace", name: "Foreign" } });
     await db.quote.create({ data: { id: "conflict-quote", userId: "owner", clientId: "foreign-client" } });
-    await assert.rejects(backfillWorkspace(db, input), WorkspaceBackfillConflictError);
+    await assert.rejects(backfillWorkspace(trackedDatabase, input), WorkspaceBackfillConflictError);
     assert.equal((await db.quote.findUniqueOrThrow({ where: { id: "conflict-quote" } })).workspaceId, null);
     console.log("✓ conflicts cancel the transaction without assigning rows");
   } finally {
