@@ -409,6 +409,7 @@ export async function processBudgetRequest(
   message: string,
   quoteId: string,
   workspaceId: string,
+  responsibleId: string,
 ): Promise<ProcessBudgetResult> {
   const text = message.trim();
   if (!text) throw new Error("Mensaje vacío.");
@@ -474,6 +475,9 @@ export async function processBudgetRequest(
                 name: payload.client.name,
                 company: payload.client.company || undefined,
                 defaultCurrency: countryConfig?.currency,
+                stage: "CLIENT",
+                prospectStatus: "WON",
+                responsibleId,
               },
             })
           ).id;

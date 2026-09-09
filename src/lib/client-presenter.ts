@@ -4,7 +4,7 @@
 // firstName+lastName (clientes creados desde el CRM) y cae a name (clientes
 // creados desde el flujo de presupuestos, que nunca llenan firstName/lastName).
 
-import type { ClientStatus, Currency } from "@/generated/prisma/enums";
+import type { ClientStage, ClientStatus, Currency, LeadSource, ProspectStatus } from "@/generated/prisma/enums";
 
 export type ClientInput = {
   id: string;
@@ -19,6 +19,14 @@ export type ClientInput = {
   website: string | null;
   defaultCurrency: Currency | null;
   status: ClientStatus;
+  stage: ClientStage;
+  prospectStatus: ProspectStatus;
+  source: LeadSource | null;
+  responsibleId: string | null;
+  responsible?: { id: string; displayName: string } | null;
+  instagram: string | null;
+  convertedAt: Date | null;
+  nextFollowUpEvent?: { id: string; title: string; startAt: Date; endAt: Date } | null;
   notes: string | null;
   archivedAt?: Date | null;
   createdAt: Date;
@@ -56,6 +64,16 @@ export function serializeClient(client: ClientInput) {
     website: client.website,
     defaultCurrency: client.defaultCurrency,
     status: client.status,
+    stage: client.stage,
+    prospectStatus: client.prospectStatus,
+    source: client.source,
+    responsibleId: client.responsibleId,
+    responsible: client.responsible ?? null,
+    instagram: client.instagram,
+    convertedAt: client.convertedAt?.toISOString() ?? null,
+    nextFollowUp: client.nextFollowUpEvent
+      ? { id: client.nextFollowUpEvent.id, title: client.nextFollowUpEvent.title, startAt: client.nextFollowUpEvent.startAt.toISOString(), endAt: client.nextFollowUpEvent.endAt.toISOString() }
+      : null,
     notes: client.notes,
     archivedAt: client.archivedAt?.toISOString() ?? null,
     createdAt: client.createdAt.toISOString(),

@@ -14,12 +14,14 @@ export type ClientCardData = ClientSnapshot & {
 type ProjectRow = { clientId?: string | null; client: string; updatedAt: Date };
 type QuoteRow = { clientId: string | null; updatedAt: Date };
 type EventRow = { clientId: string | null; startAt: Date };
+type ActivityRow = { clientId: string | null; createdAt: Date };
 
 export function buildClientCards(
   clients: ClientInput[],
   projects: ProjectRow[],
   quotes: QuoteRow[],
   events: EventRow[],
+  activity: ActivityRow[] = [],
 ): ClientCardData[] {
   const quoteCountByClientId = new Map<string, number>();
   const quoteLastByClientId = new Map<string, Date>();
@@ -37,6 +39,13 @@ export function buildClientCards(
     if (!prev || event.startAt > prev) eventLastByClientId.set(event.clientId, event.startAt);
   }
 
+  const activityLastByClientId = new Map<string, Date>();
+  for (const record of activity) {
+    if (!record.clientId) continue;
+    const prev = activityLastByClientId.get(record.clientId);
+    if (!prev || record.createdAt > prev) activityLastByClientId.set(record.clientId, record.createdAt);
+  }
+
   return clients.map((client) => {
     const snapshot = serializeClient(client);
     const matchedProjects = projects.filter((project) => (project.clientId ? project.clientId === client.id : projectMatchesClient(project.client, snapshot)));
@@ -46,7 +55,8 @@ export function buildClientCards(
     );
     const quoteLast = quoteLastByClientId.get(client.id) ?? null;
     const eventLast = eventLastByClientId.get(client.id) ?? null;
-    const lastContact = [projectLast, quoteLast, eventLast]
+    const activityLast = activityLastByClientId.get(client.id) ?? null;
+    const lastContact = [projectLast, quoteLast, eventLast, activityLast]
       .filter((date): date is Date => date !== null)
       .sort((a, b) => b.getTime() - a.getTime())[0];
 

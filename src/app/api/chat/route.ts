@@ -23,8 +23,11 @@ export async function POST(request: NextRequest) {
   };
 
   let workspaceId: string;
+  let userId: string;
   try {
-    workspaceId = (await requireWorkspaceMembership()).workspace.id;
+    const context = await requireWorkspaceMembership();
+    workspaceId = context.workspace.id;
+    userId = context.user.id;
   } catch {
     return new Response("No autorizado.", { status: 403 });
   }
@@ -75,7 +78,7 @@ export async function POST(request: NextRequest) {
             return;
           }
 
-          const result = await processBudgetRequest(text, quoteId, workspaceId);
+          const result = await processBudgetRequest(text, quoteId, workspaceId, userId);
           send({ type: "quote_updated", quote: result.quote });
           send({ type: "text", text: result.summary });
         }

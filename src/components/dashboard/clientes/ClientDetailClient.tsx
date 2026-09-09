@@ -2,11 +2,11 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { ArrowLeft, Mail, Phone, MapPin, Globe, Pencil, X, Plus, FolderPlus, CalendarPlus } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, Mail, Phone, MapPin, Globe, Pencil, X, FolderPlus, CalendarPlus, UserRoundCheck } from "lucide-react";
 import Button from "@/components/ui/Button";
 import { CLIENT_STATUS_CONFIG } from "@/lib/client-status";
-import { updateClient } from "@/app/(dashboard)/clientes/actions";
-import { createDraftQuoteForClient } from "@/app/presupuestos/quotes/actions";
+import { clearClientFollowUp, convertClientToCustomer, saveClientFollowUp, updateClient } from "@/app/(dashboard)/clientes/actions";
 import ClientFormFields from "@/components/dashboard/clientes/ClientFormFields";
 import ClientSummaryTiles, { type ClientSummary } from "@/components/dashboard/clientes/ClientSummaryTiles";
 import ClientTabs, { type ClientTabId } from "@/components/dashboard/clientes/ClientTabs";
@@ -31,6 +31,7 @@ export default function ClientDetailClient({
   events: initialEvents,
   activity,
   allClients,
+  members,
   allProjects,
   paymentsContent,
 }: {
@@ -42,6 +43,7 @@ export default function ClientDetailClient({
   events: EventSnapshot[];
   activity: ClientActivityItem[];
   allClients: { id: string; name: string }[];
+  members: { id: string; name: string }[];
   allProjects: { id: string; name: string }[];
 }) {
   const [client, setClient] = useState(initialClient);
@@ -51,6 +53,7 @@ export default function ClientDetailClient({
   const [activeTab, setActiveTab] = useState<ClientTabId>("overview");
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
+  const router = useRouter();
 
   const config = CLIENT_STATUS_CONFIG[client.status];
 
@@ -83,17 +86,23 @@ export default function ClientDetailClient({
         {isEditing ? (
           <form action={handleEditSubmit}>
             <ClientFormFields
+              stage={client.stage}
+              members={members}
+              includeFollowUp={false}
               defaultValues={{
-                firstName: client.firstName,
-                lastName: client.lastName,
+                name: client.name,
                 company: client.company,
                 email: client.email,
                 phone: client.phone,
+                instagram: client.instagram,
                 country: client.country,
                 address: client.address,
                 website: client.website,
                 notes: client.notes,
-                status: client.status,
+                source: client.source,
+                prospectStatus: client.prospectStatus,
+                responsibleId: client.responsibleId,
+                nextFollowUp: client.nextFollowUp,
               }}
             />
 
@@ -112,7 +121,7 @@ export default function ClientDetailClient({
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <h1 className="text-xl font-semibold tracking-tight">{client.displayName}</h1>
-                <p className="text-muted-foreground mt-0.5 text-sm">{client.company ?? "Sin empresa"}</p>
+                <p className="text-muted-foreground mt-0.5 text-sm">{client.company ?? (client.stage === "PROSPECT" ? "Prospecto" : "Cliente")}</p>
               </div>
               <span
                 className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${config.badgeClassName}`}
@@ -127,6 +136,8 @@ export default function ClientDetailClient({
                 <Mail className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
                 {client.email ?? "Sin email"}
               </span>
+              <span className="text-muted-foreground">Responsable: {client.responsible?.displayName ?? "Sin responsable"}</span>
+              {client.instagram ? <span className="text-muted-foreground">Instagram: @{client.instagram.replace(/^@/, "")}</span> : null}
               <span className="text-muted-foreground flex items-center gap-1.5">
                 <Phone className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
                 {client.phone ?? "Sin teléfono"}
@@ -157,17 +168,19 @@ export default function ClientDetailClient({
                 <FolderPlus className="h-4 w-4" strokeWidth={1.75} />
                 Nuevo proyecto
               </Button>
-              <form action={createDraftQuoteForClient.bind(null, client.id)}>
-                <Button type="submit" variant="secondary">
-                  <Plus className="h-4 w-4" strokeWidth={1.75} />
-                  Nuevo presupuesto
-                </Button>
-              </form>
+              {client.stage === "PROSPECT" ? <Button type="button" variant="secondary" onClick={() => startTransition(async () => { await convertClientToCustomer(client.id); router.refresh(); })} disabled={isPending}><UserRoundCheck className="h-4 w-4" strokeWidth={1.75} />Convertir en cliente</Button> : null}
               <Button type="button" variant="secondary" onClick={() => setIsEventModalOpen(true)}>
                 <CalendarPlus className="h-4 w-4" strokeWidth={1.75} />
                 Nueva reunión
               </Button>
             </div>
+            <form action={(formData) => startTransition(async () => { await saveClientFollowUp(client.id, formData); router.refresh(); })} className="border-surface-border mt-5 grid gap-2 rounded-xl border p-3 sm:grid-cols-[1fr_140px_110px_auto]">
+              <div><p className="text-sm font-medium">Próxima acción</p><p className="text-muted-foreground text-xs">{client.nextFollowUp ? `${client.nextFollowUp.title} · ${new Intl.DateTimeFormat("es-ES", { dateStyle: "medium", timeStyle: "short" }).format(new Date(client.nextFollowUp.startAt))}` : "Sin seguimiento"}</p></div>
+              <input name="followUpDate" type="date" defaultValue={client.nextFollowUp?.startAt.slice(0, 10) ?? ""} className="border-surface-border rounded-lg border px-2 text-sm" />
+              <input name="followUpTime" type="time" defaultValue={client.nextFollowUp?.startAt.slice(11, 16) ?? "09:00"} className="border-surface-border rounded-lg border px-2 text-sm" />
+              <input type="hidden" name="followUpMode" value="SCHEDULE" /><Button type="submit" variant="secondary" disabled={isPending}>Programar</Button>
+              {client.nextFollowUp ? <button type="button" onClick={() => startTransition(async () => { await clearClientFollowUp(client.id); router.refresh(); })} className="text-muted-foreground text-xs underline sm:col-start-4">Quitar seguimiento</button> : null}
+            </form>
           </>
         )}
       </div>

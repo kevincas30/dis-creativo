@@ -1,8 +1,8 @@
-import { Users, PackageCheck, Eye, CreditCard, Bell } from "lucide-react";
+import { Users, PackageCheck, Eye, CreditCard, Bell, MessageCircleMore } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { EventType } from "@/generated/prisma/enums";
 
-export const EVENT_TYPE_ORDER: EventType[] = ["MEETING", "DELIVERY", "REVIEW", "PAYMENT", "REMINDER"];
+export const EVENT_TYPE_ORDER: EventType[] = ["MEETING", "DELIVERY", "REVIEW", "PAYMENT", "FOLLOW_UP", "REMINDER"];
 
 export const EVENT_TYPE_CONFIG: Record<
   EventType,
@@ -35,6 +35,13 @@ export const EVENT_TYPE_CONFIG: Record<
     dot: "bg-violet-400",
     badgeClassName: "border-violet-400/30 bg-violet-400/10 text-violet-300",
     iconBgClassName: "bg-violet-400/15 text-violet-300",
+  },
+  FOLLOW_UP: {
+    label: "Seguimiento",
+    icon: MessageCircleMore,
+    dot: "bg-orange-400",
+    badgeClassName: "border-orange-400/30 bg-orange-400/10 text-orange-300",
+    iconBgClassName: "bg-orange-400/15 text-orange-300",
   },
   REMINDER: {
     label: "Recordatorio interno",

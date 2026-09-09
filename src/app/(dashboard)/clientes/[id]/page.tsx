@@ -23,12 +23,18 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
   const context = await requireWorkspaceMembership();
   const { workspace } = context;
 
-  const client = await prisma.client.findFirst({ where: { id, workspaceId: workspace.id } });
+  const client = await prisma.client.findFirst({
+    where: { id, workspaceId: workspace.id },
+    include: {
+      responsible: { select: { id: true, displayName: true } },
+      nextFollowUpEvent: { select: { id: true, title: true, startAt: true, endAt: true } },
+    },
+  });
   if (!client) {
     notFound();
   }
 
-  const [quotes, events, userProjects, allClients] = await Promise.all([
+  const [quotes, events, userProjects, allClients, members] = await Promise.all([
     prisma.quote.findMany({
       where: { workspaceId: workspace.id, clientId: id },
       orderBy: { updatedAt: "desc" },
@@ -53,6 +59,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
     }),
     prisma.project.findMany({ where: { workspaceId: workspace.id }, orderBy: { updatedAt: "desc" } }),
     prisma.client.findMany({ where: { workspaceId: workspace.id, archivedAt: null }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    prisma.workspaceMember.findMany({ where: { workspaceId: workspace.id }, include: { user: { select: { id: true, displayName: true } } }, orderBy: { user: { displayName: "asc" } } }),
   ]);
 
   const serializedClient = serializeClient(client);
@@ -97,6 +104,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
           events={serializedEvents}
           activity={activity}
           allClients={allClients}
+          members={members.map((member) => ({ id: member.user.id, name: member.user.displayName }))}
           allProjects={userProjects.map((project) => ({ id: project.id, name: project.name }))}
         />
         {context.membership.role === "ADMIN" && <ArchiveClientButton id={id} archived={!!client.archivedAt} />}
