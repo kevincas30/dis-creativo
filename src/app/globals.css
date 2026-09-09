@@ -75,6 +75,19 @@ body {
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
+/* Chrome aplica un fondo propio a los valores recordados. Dentro del
+   formulario comercial se reemplaza por los tokens del tema actual. */
+.client-form input:-webkit-autofill,
+.client-form input:-webkit-autofill:hover,
+.client-form input:-webkit-autofill:focus,
+.client-form textarea:-webkit-autofill,
+.client-form select:-webkit-autofill {
+  -webkit-text-fill-color: var(--foreground);
+  -webkit-box-shadow: 0 0 0 1000px var(--surface-solid) inset;
+  caret-color: var(--foreground);
+  transition: background-color 9999s ease-out 0s;
+}
+
 /* Scrollbar fino y semitransparente, estilo overlay de macOS. */
 * {
   scrollbar-width: thin;

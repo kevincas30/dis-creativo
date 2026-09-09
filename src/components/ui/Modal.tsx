@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useRef, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 function subscribeNoop() {
@@ -23,31 +23,43 @@ export default function Modal({
   onClose,
   children,
   className = "max-w-sm",
+  ariaLabel,
 }: {
   isOpen: boolean;
   onClose: () => void;
   children: ReactNode;
   className?: string;
+  ariaLabel?: string;
 }) {
   const mounted = useMounted();
+  const previousFocus = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     if (!isOpen) return;
+    previousFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") onCloseRef.current();
     }
 
     document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      previousFocus.current?.focus();
+    };
+  }, [isOpen]);
 
   if (!mounted || !isOpen) return null;
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="animate-fade-in-up absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className={`animate-scale-in bg-surface-solid/95 border-surface-border shadow-elevated relative w-full rounded-2xl border p-6 backdrop-blur-sm ${className}`}>
+      <div role="dialog" aria-modal="true" aria-label={ariaLabel} tabIndex={-1} className={`animate-scale-in bg-surface-solid/95 border-surface-border shadow-elevated relative w-full rounded-2xl border p-6 backdrop-blur-sm ${className}`}>
         {children}
       </div>
     </div>,

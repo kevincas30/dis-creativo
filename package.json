@@ -17,7 +17,8 @@
     "start": "next start",
     "lint": "eslint",
     "backfill:quotes-phase2": "tsx scripts/backfill-quote-phase2.ts",
-    "test:quotes": "tsx tests/quote-workflow.integration.ts"
+    "test:quotes": "tsx tests/quote-workflow.integration.ts",
+    "test:client-form": "tsx --test src/components/dashboard/clientes/client-form-utils.test.ts"
   },
   "dependencies": {
     "@google/genai": "^2.13.0",

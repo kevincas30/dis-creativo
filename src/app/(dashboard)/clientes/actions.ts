@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { archiveClientRecord } from "@/lib/work-service";
 import {
@@ -64,7 +63,7 @@ export async function createClient(formData: FormData) {
   const context = await requireWorkspaceMembership();
   const client = await createCommercialClient(prisma, workspaceActor(context), inputFromForm(formData));
   revalidatePath("/", "layout");
-  redirect(`/clientes/${client.id}`);
+  return { id: client.id, stage: client.stage, displayName: client.name };
 }
 
 export async function updateClient(clientId: string, formData: FormData) {
