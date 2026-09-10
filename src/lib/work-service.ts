@@ -75,12 +75,13 @@ export async function runWorkCommand(db: PrismaClient, actor: WorkspaceActor, pr
         const created = await tx.projectPeriod.create({ data: {
           projectId, label: textField(form, "label", true)!, startDate, dueDate,
           agreedTotal: copy("copyPrice") ? (source ?? project).agreedTotal : null,
+          depositExpected: copy("copyPrice") ? (source ?? project).depositExpected : null,
           currency: copy("copyPrice") ? (source ?? project).currency : null,
           paymentDueDate: source && copy("copyConfig") ? shifted(source.paymentDueDate) : null,
         } });
         if (source && (copy("copyTasks") || copy("copyStructure"))) {
           const items = source.workItems.filter((item) => (copy("copyTasks") && item.recurring) || copy("copyStructure"));
-          for (const item of items) await tx.workItem.create({ data: { workspaceId: actor.workspaceId, projectId, periodId: created.id, title: item.title, kind: item.kind, priority: item.priority, recurring: item.recurring, dueDate: copy("copyConfig") ? shifted(item.dueDate) : null } });
+          for (const item of items) await tx.workItem.create({ data: { workspaceId: actor.workspaceId, projectId, periodId: created.id, title: item.title, kind: item.kind, priority: item.priority, recurring: item.recurring, dueDate: copy("copyConfig") ? shifted(item.dueDate) : null, responsibleId: item.responsibleId, needsReview: item.needsReview } });
         }
         if (copy("copyTeam")) {
           const assignments = source?.assignments ?? await tx.workAssignment.findMany({ where: { projectId, periodId: null } });
@@ -102,6 +103,7 @@ export async function runWorkCommand(db: PrismaClient, actor: WorkspaceActor, pr
             dueDate,
             status: project.status,
             agreedTotal: project.agreedTotal,
+            depositExpected: project.depositExpected,
             currency: project.currency,
             paymentDueDate: project.paymentDueDate,
           },
@@ -118,11 +120,13 @@ export async function runWorkCommand(db: PrismaClient, actor: WorkspaceActor, pr
       }
       case "dates": {
         requireScope();
+        const startDate = dateField(form, "startDate");
         const dueDate = dateField(form, "dueDate");
-        if (period && dueDate && dueDate < period.startDate) throw new Error("La entrega no puede ser anterior al inicio.");
+        const effectiveStart = period ? period.startDate : startDate;
+        if (dueDate && effectiveStart && dueDate < effectiveStart) throw new Error("La entrega no puede ser anterior al inicio.");
         if (period) await tx.projectPeriod.update({ where: { id: period.id }, data: { dueDate } });
-        else await tx.project.update({ where: { id: projectId }, data: { dueDate } });
-        await record("DELIVERY_DATE_CHANGED", `Fecha de entrega: ${dueDate?.toISOString().slice(0, 10) ?? "sin fecha"}`);
+        else await tx.project.update({ where: { id: projectId }, data: { startDate, dueDate } });
+        await record("PROJECT_DATES_CHANGED", `Fechas del proyecto: inicio ${startDate?.toISOString().slice(0, 10) ?? "sin fecha"}; entrega ${dueDate?.toISOString().slice(0, 10) ?? "sin fecha"}`);
         return;
       }
       case "unassign": {
@@ -139,7 +143,10 @@ export async function runWorkCommand(db: PrismaClient, actor: WorkspaceActor, pr
         if (!["MXN", "EUR"].includes(currency)) throw new Error("Moneda no válida.");
         const payments = await tx.payment.count({ where });
         if (payments && scope.currency !== currency) throw new Error("No se puede cambiar la moneda de pagos ya registrados.");
-        const data = { currency: currency as "MXN" | "EUR", agreedTotal: moneyField(form, "agreedTotal"), paymentDueDate: dateField(form, "paymentDueDate") };
+        const agreedTotal = moneyField(form, "agreedTotal");
+        const depositExpected = moneyField(form, "depositExpected");
+        if (agreedTotal && depositExpected && depositExpected.gt(agreedTotal)) throw new Error("El anticipo no puede superar el importe total.");
+        const data = { currency: currency as "MXN" | "EUR", agreedTotal, depositExpected, paymentDueDate: dateField(form, "paymentDueDate") };
         if (period) await tx.projectPeriod.update({ where: { id: period.id }, data });
         else await tx.project.update({ where: { id: projectId }, data });
         await record("FINANCE_UPDATED", "Importe acordado y vencimiento de pago actualizados");
@@ -153,13 +160,34 @@ export async function runWorkCommand(db: PrismaClient, actor: WorkspaceActor, pr
         const paidAt = dateField(form, "paidAt", true)!;
         if (paidAt > new Date()) throw new Error("No se puede registrar un pago futuro.");
         const requestId = textField(form, "requestId", true)!;
+        const type = textField(form, "type") ?? "PARTIAL";
+        if (!["DEPOSIT", "BALANCE", "PARTIAL"].includes(type)) throw new Error("Tipo de pago no válido.");
         const existing = await tx.payment.findUnique({ where: { requestId } });
         if (existing) {
-          if (existing.projectId !== projectId || existing.periodId !== periodId || !existing.amount.equals(amount) || existing.paidAt.getTime() !== paidAt.getTime()) throw new Error("La solicitud de pago ya se utilizó.");
+          if (existing.projectId !== projectId || existing.periodId !== periodId || !existing.amount.equals(amount) || existing.paidAt.getTime() !== paidAt.getTime() || existing.type !== type) throw new Error("La solicitud de pago ya se utilizó.");
           return;
         }
-        await tx.payment.create({ data: { ...where, requestId, amount, paidAt, currency: scope.currency, recordedById: actor.userId, note: textField(form, "note") } });
-        await record("PAYMENT_RECORDED", `Pago registrado: ${amount.toFixed(2)} ${scope.currency}`);
+        await tx.payment.create({ data: { ...where, requestId, type: type as "DEPOSIT" | "BALANCE" | "PARTIAL", amount, paidAt, currency: scope.currency, recordedById: actor.userId, note: textField(form, "note") } });
+        const expected = scope.depositExpected;
+        if (type === "DEPOSIT" && expected?.gt(0)) {
+          const depositPayments = await tx.payment.findMany({ where: { ...where, type: "DEPOSIT" }, select: { amount: true } });
+          const received = depositPayments.reduce((sum, item) => sum.plus(item.amount), new Prisma.Decimal(0));
+          if (received.gte(expected)) {
+            if (period) await tx.projectPeriod.update({ where: { id: period.id }, data: { status: "IN_PROGRESS" } });
+            if (project.status === "NOT_STARTED") await tx.project.update({ where: { id: projectId }, data: { status: "IN_PROGRESS" } });
+            await record("PROJECT_ACTIVATED_BY_DEPOSIT", `Anticipo completo recibido: ${received.toFixed(2)} ${scope.currency}`);
+          }
+        }
+        await record("PAYMENT_RECORDED", `Pago ${type === "DEPOSIT" ? "de anticipo" : type === "BALANCE" ? "de saldo" : "parcial"} registrado: ${amount.toFixed(2)} ${scope.currency}`);
+        return;
+      }
+      case "activate": {
+        requireScope();
+        if (actor.role !== "ADMIN") throw new Error("Solo un administrador puede activar manualmente el proyecto.");
+        if (textField(form, "confirmation") !== "ACTIVAR") throw new Error("Confirma la activación escribiendo ACTIVAR.");
+        if (period) await tx.projectPeriod.update({ where: { id: period.id }, data: { status: "IN_PROGRESS" } });
+        await tx.project.update({ where: { id: projectId }, data: { status: "IN_PROGRESS" } });
+        await record("PROJECT_ACTIVATED_MANUALLY", "Proyecto activado manualmente por un administrador.");
         return;
       }
       case "addWork": {
@@ -168,7 +196,9 @@ export async function runWorkCommand(db: PrismaClient, actor: WorkspaceActor, pr
         const priority = textField(form, "priority") ?? "NORMAL";
         if (!["TASK", "DELIVERABLE"].includes(kind) || !["LOW", "NORMAL", "HIGH"].includes(priority)) throw new Error("Tipo o prioridad no válidos.");
         const title = textField(form, "title", true)!;
-        await tx.workItem.create({ data: { workspaceId: actor.workspaceId, ...where, title, kind: kind as never, priority: priority as never, dueDate: dateField(form, "dueDate"), recurring: form.get("recurring") === "on" } });
+        const responsibleId = textField(form, "responsibleId");
+        if (responsibleId && !await tx.workspaceMember.findFirst({ where: { workspaceId: actor.workspaceId, userId: responsibleId } })) throw new Error("La persona responsable no pertenece al workspace actual.");
+        await tx.workItem.create({ data: { workspaceId: actor.workspaceId, ...where, title, kind: kind as never, priority: priority as never, dueDate: dateField(form, "dueDate"), responsibleId, needsReview: form.get("needsReview") === "on", recurring: form.get("recurring") === "on" } });
         await record("WORK_CREATED", `${kind === "TASK" ? "Tarea" : "Entregable"} creado: ${title}`);
         return;
       }

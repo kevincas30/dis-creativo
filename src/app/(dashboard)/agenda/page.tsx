@@ -3,11 +3,12 @@ import { requireWorkspaceMembership } from "@/lib/workspace-access";
 import { serializeEvent } from "@/lib/event-presenter";
 import DashboardBackground from "@/components/dashboard/DashboardBackground";
 import AgendaPageClient from "@/components/dashboard/agenda/AgendaPageClient";
+import { getProjectAgendaItems } from "@/lib/project-agenda-items";
 
 export default async function AgendaComercialPage() {
   const { workspace } = await requireWorkspaceMembership();
 
-  const [events, clients, projects] = await Promise.all([
+  const [events, clients, projects, projectDateItems] = await Promise.all([
     prisma.event.findMany({
       where: { workspaceId: workspace.id },
       orderBy: { startAt: "asc" },
@@ -27,6 +28,7 @@ export default async function AgendaComercialPage() {
     }),
     prisma.client.findMany({ where: { workspaceId: workspace.id, archivedAt: null }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
     prisma.project.findMany({ where: { workspaceId: workspace.id }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    getProjectAgendaItems(prisma, workspace.id),
   ]);
 
   return (
@@ -34,7 +36,7 @@ export default async function AgendaComercialPage() {
       <DashboardBackground />
 
       <div className="mx-auto flex w-full max-w-6xl min-h-0 flex-1 flex-col pb-4 lg:block lg:pb-12">
-        <AgendaPageClient initialEvents={events.map(serializeEvent)} clients={clients} projects={projects} />
+        <AgendaPageClient initialEvents={[...events.map(serializeEvent), ...projectDateItems]} clients={clients} projects={projects} />
       </div>
     </div>
   );

@@ -15,6 +15,10 @@ export type ProjectInput = {
   type: string | null;
   description: string | null;
   owner: string | null;
+  responsibleId?: string | null;
+  startDate?: Date | null;
+  depositExpected?: { toFixed: (digits: number) => string } | null;
+  archivedAt?: Date | null;
   dueDate: Date | null;
   progress: number;
   status: ProjectStatus;
@@ -39,6 +43,10 @@ export function serializeProject(project: ProjectInput) {
     type: project.type,
     description: project.description,
     owner: project.owner,
+    responsibleId: project.responsibleId ?? null,
+    startDate: project.startDate ? project.startDate.toISOString() : null,
+    depositExpected: project.depositExpected?.toFixed(2) ?? null,
+    archivedAt: project.archivedAt ? project.archivedAt.toISOString() : null,
     dueDate: project.dueDate ? project.dueDate.toISOString() : null,
     progress: project.progress,
     status: project.status,

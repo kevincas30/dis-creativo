@@ -1,6 +1,6 @@
 import { isSameDay, dayKey } from "@/lib/dashboard-agenda-dates";
 import EventChip from "@/components/dashboard/agenda/EventChip";
-import type { EventSnapshot } from "@/lib/event-presenter";
+import type { AgendaItemSnapshot } from "@/lib/event-presenter";
 
 const WEEKDAY_FULL_LABELS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
@@ -11,7 +11,7 @@ export default function WeekCalendarGrid({
   onSelectDay,
 }: {
   days: Date[];
-  eventsByDay: Map<string, EventSnapshot[]>;
+  eventsByDay: Map<string, AgendaItemSnapshot[]>;
   selectedDay: Date;
   onSelectDay: (date: Date) => void;
 }) {

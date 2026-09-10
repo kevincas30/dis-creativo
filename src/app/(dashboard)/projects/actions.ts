@@ -7,6 +7,7 @@ import { requireWorkspaceAdmin, requireWorkspaceMembership } from "@/lib/workspa
 import { serializeProject } from "@/lib/project-presenter";
 import { PROJECT_STATUS_ORDER } from "@/lib/project-status";
 import type { ProjectStatus } from "@/generated/prisma/enums";
+import { prepareProjectFromQuote, type ProjectPreparationInput } from "@/lib/project-preparation-service";
 
 function readTextField(formData: FormData, key: string): string | null {
   const raw = formData.get(key);
@@ -128,4 +129,24 @@ export async function deleteProject(projectId: string) {
   revalidatePath("/");
   revalidatePath("/projects");
   redirect("/projects");
+}
+
+/** Persists a reviewed project preparation. The wizard itself never writes. */
+export async function confirmProjectPreparation(input: ProjectPreparationInput) {
+  const { user, workspace, membership } = await requireWorkspaceMembership();
+  const result = await prepareProjectFromQuote(prisma, { userId: user.id, workspaceId: workspace.id, role: membership.role }, input);
+  revalidatePath("/", "layout");
+  return result;
+}
+
+export async function setProjectArchived(projectId: string, archived: boolean) {
+  const { user, workspace } = await requireWorkspaceAdmin();
+  const project = await prisma.project.findFirst({ where: { id: projectId, workspaceId: workspace.id } });
+  if (!project) throw new Error("Proyecto no disponible en el workspace actual.");
+  if (Boolean(project.archivedAt) === archived) return;
+  await prisma.$transaction(async (tx) => {
+    await tx.project.update({ where: { id: projectId }, data: { archivedAt: archived ? new Date() : null } });
+    await tx.activityRecord.create({ data: { workspaceId: workspace.id, actorId: user.id, projectId, clientId: project.clientId, action: archived ? "PROJECT_ARCHIVED" : "PROJECT_RESTORED", description: archived ? "Proyecto archivado; historial conservado" : "Proyecto restaurado" } });
+  });
+  revalidatePath("/", "layout");
 }

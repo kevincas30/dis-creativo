@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { addMonths, dayKey, formatMonthLabel, getMonthGridDays, isSameDay, WEEKDAY_LABELS } from "@/lib/dashboard-agenda-dates";
 import MobileMonthGrid from "@/components/dashboard/agenda/mobile/MobileMonthGrid";
 import MobileDayView from "@/components/dashboard/agenda/mobile/MobileDayView";
-import type { EventSnapshot } from "@/lib/event-presenter";
+import type { AgendaItemSnapshot } from "@/lib/event-presenter";
 
 const MONTHS_BEFORE = 2;
 const MONTHS_AFTER = 2;
@@ -18,7 +18,7 @@ function offsetWithin(container: HTMLElement, target: HTMLElement): number {
 // arriba y una etiqueta de mes que se sincroniza con lo que está visible.
 // Entra siempre en el mes actual, con MONTHS_BEFORE/MONTHS_AFTER meses de
 // margen a cada lado. Estado de navegación totalmente independiente del desktop.
-export default function MobileAgendaView({ eventsByDay }: { eventsByDay: Map<string, EventSnapshot[]> }) {
+export default function MobileAgendaView({ eventsByDay }: { eventsByDay: Map<string, AgendaItemSnapshot[]> }) {
   const todayMonthStart = useMemo(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);

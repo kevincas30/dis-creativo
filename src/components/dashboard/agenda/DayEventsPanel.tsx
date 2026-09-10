@@ -1,8 +1,8 @@
 import { formatDayLabel, formatTime, isSameDay } from "@/lib/dashboard-agenda-dates";
 import EventRow from "@/components/dashboard/agenda/EventRow";
-import type { EventSnapshot } from "@/lib/event-presenter";
+import type { AgendaItemSnapshot } from "@/lib/event-presenter";
 
-export default function DayEventsPanel({ date, events }: { date: Date; events: EventSnapshot[] }) {
+export default function DayEventsPanel({ date, events }: { date: Date; events: AgendaItemSnapshot[] }) {
   const isToday = isSameDay(date, new Date());
 
   return (

@@ -19,6 +19,12 @@ export type EventInput = {
 
 export type EventSnapshot = ReturnType<typeof serializeEvent>;
 
+export type AgendaItemSnapshot = EventSnapshot & {
+  agendaKind?: "EVENT" | "PROJECT_START" | "PROJECT_DUE";
+  href?: string | null;
+  allDay?: boolean;
+};
+
 export function serializeEvent(event: EventInput) {
   return {
     id: event.id,

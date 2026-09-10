@@ -11,7 +11,7 @@ import {
   isSameDay,
 } from "@/lib/dashboard-agenda-dates";
 import EventTimelineCard from "@/components/dashboard/agenda/mobile/EventTimelineCard";
-import type { EventSnapshot } from "@/lib/event-presenter";
+import type { AgendaItemSnapshot } from "@/lib/event-presenter";
 
 const HOUR_HEIGHT = 64;
 const TOTAL_HEIGHT = HOUR_HEIGHT * 24;
@@ -33,7 +33,7 @@ export default function MobileDayView({
   onChangeDay,
 }: {
   date: Date;
-  eventsByDay: Map<string, EventSnapshot[]>;
+  eventsByDay: Map<string, AgendaItemSnapshot[]>;
   onClose: () => void;
   onChangeDay: (date: Date) => void;
 }) {

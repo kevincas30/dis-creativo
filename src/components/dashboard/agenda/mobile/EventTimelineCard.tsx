@@ -1,8 +1,8 @@
 import { formatTime } from "@/lib/dashboard-agenda-dates";
 import { EVENT_TYPE_CONFIG } from "@/lib/event-type";
-import type { EventSnapshot } from "@/lib/event-presenter";
+import type { AgendaItemSnapshot } from "@/lib/event-presenter";
 
-export default function EventTimelineCard({ event, top, height }: { event: EventSnapshot; top: number; height: number }) {
+export default function EventTimelineCard({ event, top, height }: { event: AgendaItemSnapshot; top: number; height: number }) {
   const config = EVENT_TYPE_CONFIG[event.type];
 
   return (

@@ -1,8 +1,8 @@
 import { formatDayLabel, formatTime, isSameDay } from "@/lib/dashboard-agenda-dates";
 import EventRow from "@/components/dashboard/agenda/EventRow";
-import type { EventSnapshot } from "@/lib/event-presenter";
+import type { AgendaItemSnapshot } from "@/lib/event-presenter";
 
-export type AgendaListDay = { date: Date; events: EventSnapshot[] };
+export type AgendaListDay = { date: Date; events: AgendaItemSnapshot[] };
 
 export default function AgendaListView({ days, onSelectDay }: { days: AgendaListDay[]; onSelectDay: (date: Date) => void }) {
   if (days.length === 0) {

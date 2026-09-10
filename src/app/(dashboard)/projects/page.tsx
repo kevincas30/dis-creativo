@@ -11,7 +11,7 @@ export default async function ProjectsPage() {
   const { workspace } = await requireWorkspaceMembership();
 
   const projects = await prisma.project.findMany({
-    where: { workspaceId: workspace.id },
+    where: { workspaceId: workspace.id, archivedAt: null },
     orderBy: { createdAt: "desc" },
     include: { periods: { orderBy: { startDate: "desc" } } },
   });

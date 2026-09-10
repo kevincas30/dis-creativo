@@ -9,6 +9,8 @@ import { runWorkCommand, archiveClientRecord } from "../src/lib/work-service";
 import { financialSummary, nextMonthDate } from "../src/lib/work-finance";
 import { isActiveProject } from "../src/lib/project-status";
 import { projectAttention } from "../src/lib/workspace-summary";
+import { prepareProjectFromQuote } from "../src/lib/project-preparation-service";
+import { getProjectAgendaItems } from "../src/lib/project-agenda-items";
 
 // Always creates an isolated in-memory PostgreSQL instance. Never reads DATABASE_URL.
 async function main() {
@@ -45,11 +47,38 @@ async function main() {
     ] });
     await db.client.update({ where: { id: "client" }, data: { workspaceId: "workspace" } });
     await db.quote.update({ where: { id: "quote" }, data: { workspaceId: "workspace" } });
+    await db.quote.create({ data: { id: "approved", workspaceId: "workspace", userId: "owner", clientId: "client", responsibleId: "owner", currency: "EUR", status: "ACCEPTED", total: "200", depositKind: "PERCENTAGE", depositValue: "50", lineItems: { create: [{ description: "Branding", quantity: "1", unitPrice: "200", lineTotal: "200" }] } } });
+    const projectsBeforePreparation = await db.project.count();
+    const prepared = await prepareProjectFromQuote(db, ownerActor, { quoteId: "approved", name: "Branding launch", kind: "RECURRING", startDate: "2026-09-01", dueDate: "2026-09-30", agreedTotal: "200", depositExpected: "100", responsibleId: "owner", tasks: [{ title: "Diseñar identidad", responsibleId: "other", dueDate: "2026-09-10", needsReview: true }] });
+    assert.equal(await db.project.count(), projectsBeforePreparation + 1);
+    assert.equal(prepared.created, true);
+    const retry = await prepareProjectFromQuote(db, ownerActor, { quoteId: "approved", name: "Ignored retry", kind: "ONE_OFF", startDate: null, dueDate: null, agreedTotal: "200", depositExpected: "100", responsibleId: "owner", tasks: [] });
+    assert.equal(retry.id, prepared.id); assert.equal(retry.created, false);
+    const preparedProject = await db.project.findUniqueOrThrow({ where: { id: prepared.id }, include: { periods: true, workItems: true } });
+    assert.equal(preparedProject.status, "NOT_STARTED"); assert.equal(preparedProject.periods.length, 1); assert.equal(preparedProject.workItems[0]?.needsReview, true); assert.equal(preparedProject.workItems[0]?.responsibleId, "other");
+    check("reviewed preparation creates project, initial monthly period and editable task data only on confirmation; retries do not duplicate it");
+    const preparedPeriod = preparedProject.periods[0]!;
+    await command(prepared.id, "payment", { periodId: preparedPeriod.id, amount: "40", type: "DEPOSIT", paidAt: "2026-09-02", requestId: "deposit-partial" });
+    assert.equal((await db.project.findUniqueOrThrow({ where: { id: prepared.id } })).status, "NOT_STARTED");
+    await command(prepared.id, "payment", { periodId: preparedPeriod.id, amount: "60", type: "DEPOSIT", paidAt: "2026-09-03", requestId: "deposit-final" });
+    assert.equal((await db.project.findUniqueOrThrow({ where: { id: prepared.id } })).status, "IN_PROGRESS");
+    await assert.rejects(runWorkCommand(db, memberActor, prepared.id, form("activate", { periodId: preparedPeriod.id, confirmation: "ACTIVAR" })), /administrador/);
+    assert.equal((await db.quote.findUniqueOrThrow({ where: { id: "approved" } })).status, "ACCEPTED");
+    check("partial deposits keep project prepared; complete deposit activates it without changing the approved quote and only admins can activate manually");
     await db.project.create({ data: { id: "one", workspaceId: "workspace", userId: "owner", name: "Website", client: "Legacy client", clientId: "client", dueDate: new Date("2020-01-01") } });
     await command("one", "finance", { agreedTotal: "100.10", currency: "EUR", paymentDueDate: "2020-01-01" });
+    await command("one", "dates", { startDate: "2026-09-01", dueDate: "2026-09-15" });
+    let agendaDates = await getProjectAgendaItems(db, "workspace");
+    assert.ok(agendaDates.some((item) => item.projectId === "one" && item.agendaKind === "PROJECT_START"));
+    assert.ok(agendaDates.some((item) => item.projectId === "one" && item.agendaKind === "PROJECT_DUE"));
+    assert.equal(await db.event.count({ where: { projectId: "one" } }), 0);
+    await command("one", "dates", { startDate: "2026-09-01", dueDate: "" });
+    agendaDates = await getProjectAgendaItems(db, "workspace");
+    assert.equal(agendaDates.some((item) => item.projectId === "one" && item.agendaKind === "PROJECT_DUE"), false);
+    check("project start and delivery appear in Agenda as derived all-day items, move with dates and never create duplicate events");
     await command("one", "status", { status: "DELIVERED" });
     let project = await db.project.findUniqueOrThrow({ where: { id: "one" } });
-    assert.equal(project.progress, 0); assert.equal(await db.payment.count(), 0);
+    assert.equal(project.progress, 0); assert.equal(await db.payment.count({ where: { projectId: "one" } }), 0);
     assert.equal(projectAttention(project, "2026-09-07"), null);
     check("delivery removes overdue warning and changes neither progress nor payment");
     await command("one", "payment", { amount: "30.05", paidAt: "2026-01-01", requestId: "partial-one" });

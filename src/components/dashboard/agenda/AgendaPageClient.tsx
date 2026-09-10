@@ -24,7 +24,7 @@ import {
   getWeekDays,
   toDateInputValue,
 } from "@/lib/dashboard-agenda-dates";
-import type { EventSnapshot } from "@/lib/event-presenter";
+import type { AgendaItemSnapshot } from "@/lib/event-presenter";
 
 export type AgendaView = "month" | "week" | "day" | "list";
 
@@ -33,7 +33,7 @@ export default function AgendaPageClient({
   clients,
   projects,
 }: {
-  initialEvents: EventSnapshot[];
+  initialEvents: AgendaItemSnapshot[];
   clients: { id: string; name: string }[];
   projects: { id: string; name: string }[];
 }) {
@@ -55,7 +55,7 @@ export default function AgendaPageClient({
   );
 
   const eventsByDay = useMemo(() => {
-    const map = new Map<string, EventSnapshot[]>();
+    const map = new Map<string, AgendaItemSnapshot[]>();
     for (const event of events) {
       const key = dayKey(new Date(event.startAt));
       const existing = map.get(key);
@@ -93,7 +93,7 @@ export default function AgendaPageClient({
     return days.sort((a, b) => a.date.getTime() - b.date.getTime());
   }, [eventsByDay, referenceDate]);
 
-  function handleCreated(created: EventSnapshot) {
+  function handleCreated(created: AgendaItemSnapshot) {
     setEvents((prev) => [...prev, created]);
   }
 

@@ -1,6 +1,6 @@
 import { WEEKDAY_LABELS, isSameDay, dayKey } from "@/lib/dashboard-agenda-dates";
 import EventChip from "@/components/dashboard/agenda/EventChip";
-import type { EventSnapshot } from "@/lib/event-presenter";
+import type { AgendaItemSnapshot } from "@/lib/event-presenter";
 
 const MAX_VISIBLE_PER_DAY = 3;
 
@@ -13,7 +13,7 @@ export default function MonthCalendarGrid({
 }: {
   days: Date[];
   referenceDate: Date;
-  eventsByDay: Map<string, EventSnapshot[]>;
+  eventsByDay: Map<string, AgendaItemSnapshot[]>;
   selectedDay: Date;
   onSelectDay: (date: Date) => void;
 }) {

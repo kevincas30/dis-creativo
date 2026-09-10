@@ -1,6 +1,6 @@
 import { isSameDay, dayKey } from "@/lib/dashboard-agenda-dates";
 import { EVENT_TYPE_CONFIG } from "@/lib/event-type";
-import type { EventSnapshot } from "@/lib/event-presenter";
+import type { AgendaItemSnapshot } from "@/lib/event-presenter";
 
 const MAX_VISIBLE_DOTS = 4;
 
@@ -16,7 +16,7 @@ export default function MobileMonthGrid({
 }: {
   days: Date[];
   referenceDate: Date;
-  eventsByDay: Map<string, EventSnapshot[]>;
+  eventsByDay: Map<string, AgendaItemSnapshot[]>;
   onSelectDay: (date: Date) => void;
 }) {
   const today = new Date();

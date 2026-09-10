@@ -137,9 +137,9 @@ export default function GlobalSidebar({ user }: { user: SidebarUser }) {
                   </Link>
                 );
               })}
-              <button type="button" aria-label="Más opciones de navegación" title="Más" onClick={(event) => { event.stopPropagation(); setShowMore(true); setIsCollapsed(false); }}
-                className="text-muted-foreground hover:bg-foreground/5 hover:text-foreground flex h-9 w-9 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
-                <MoreHorizontal className="h-4 w-4" />
+              <button type="button" aria-label="Más acciones" title="Más" onClick={(event) => { event.stopPropagation(); setShowMore(true); setIsCollapsed(false); }}
+                className="text-muted-foreground hover:bg-foreground/5 hover:text-foreground flex h-10 w-10 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40">
+                <MoreHorizontal className="h-5 w-5" />
               </button>
             </nav>
 

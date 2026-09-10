@@ -61,6 +61,12 @@ enum ProjectStatus {
   CANCELLED
 }
 
+enum PaymentType {
+  DEPOSIT
+  BALANCE
+  PARTIAL
+}
+
 enum ProjectKind {
   ONE_OFF
   RECURRING
@@ -131,16 +137,18 @@ model User {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  quotes             Quote[]
-  projects           Project[]
-  events             Event[]
-  assignments        WorkAssignment[]
-  recordedPayments   Payment[]
-  activityRecords    ActivityRecord[]
-  workspaceMembers   WorkspaceMember[]
-  responsibleClients Client[]             @relation("ClientResponsible")
-  responsibleQuotes  Quote[]              @relation("QuoteResponsible")
-  quoteStatusChanges QuoteStatusHistory[] @relation("QuoteStatusChangedBy")
+  quotes               Quote[]
+  projects             Project[]
+  events               Event[]
+  assignments          WorkAssignment[]
+  recordedPayments     Payment[]
+  responsibleProjects  Project[]            @relation("ProjectResponsible")
+  responsibleWorkItems WorkItem[]           @relation("WorkItemResponsible")
+  activityRecords      ActivityRecord[]
+  workspaceMembers     WorkspaceMember[]
+  responsibleClients   Client[]             @relation("ClientResponsible")
+  responsibleQuotes    Quote[]              @relation("QuoteResponsible")
+  quoteStatusChanges   QuoteStatusHistory[] @relation("QuoteStatusChangedBy")
 
   @@map("users")
 }
@@ -430,21 +438,26 @@ model QuoteStatusHistory {
 /// son texto libre porque todavía no existen los módulos reales de Clientes
 /// ni Equipo (ambos siguen siendo placeholders "Próximamente").
 model Project {
-  id          String        @id @default(uuid())
-  workspaceId String?
-  workspace   Workspace?    @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
-  userId      String
-  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name        String
-  client      String
-  type        String?
-  description String?       @db.Text
-  owner       String?
-  dueDate     DateTime?
-  progress    Int           @default(0)
-  status      ProjectStatus @default(NOT_STARTED)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  id              String        @id @default(uuid())
+  workspaceId     String?
+  workspace       Workspace?    @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  userId          String
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name            String
+  client          String
+  type            String?
+  description     String?       @db.Text
+  owner           String?
+  responsibleId   String?
+  responsible     User?         @relation("ProjectResponsible", fields: [responsibleId], references: [id], onDelete: Restrict)
+  startDate       DateTime?     @db.Date
+  dueDate         DateTime?
+  depositExpected Decimal?      @db.Decimal(12, 2)
+  archivedAt      DateTime?
+  progress        Int           @default(0)
+  status          ProjectStatus @default(NOT_STARTED)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
   kind               ProjectKind        @default(ONE_OFF)
   relationshipStatus RelationshipStatus @default(ACTIVE)
@@ -465,6 +478,8 @@ model Project {
   @@index([clientId])
   @@index([quoteId])
   @@index([workspaceId])
+  @@index([workspaceId, archivedAt])
+  @@index([responsibleId])
   @@map("projects")
 }
 
@@ -510,6 +525,7 @@ model ProjectPeriod {
   dueDate         DateTime?        @db.Date
   status          ProjectStatus    @default(NOT_STARTED)
   agreedTotal     Decimal?         @db.Decimal(12, 2)
+  depositExpected Decimal?         @db.Decimal(12, 2)
   currency        Currency?
   paymentDueDate  DateTime?        @db.Date
   createdAt       DateTime         @default(now())
@@ -533,6 +549,7 @@ model Payment {
   periodId     String?
   period       ProjectPeriod? @relation(fields: [periodId], references: [id], onDelete: Restrict)
   amount       Decimal        @db.Decimal(12, 2)
+  type         PaymentType    @default(PARTIAL)
   currency     Currency
   paidAt       DateTime       @db.Date
   note         String?
@@ -541,27 +558,32 @@ model Payment {
   createdAt    DateTime       @default(now())
 
   @@index([projectId, periodId])
+  @@index([type])
   @@map("payments")
 }
 
 model WorkItem {
-  id          String         @id @default(uuid())
-  workspaceId String?
-  workspace   Workspace?     @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
-  projectId   String
-  project     Project        @relation(fields: [projectId], references: [id], onDelete: Restrict)
-  periodId    String?
-  period      ProjectPeriod? @relation(fields: [periodId], references: [id], onDelete: Restrict)
-  title       String
-  kind        WorkItemKind   @default(TASK)
-  priority    WorkPriority   @default(NORMAL)
-  dueDate     DateTime?      @db.Date
-  recurring   Boolean        @default(false)
-  completedAt DateTime?
-  createdAt   DateTime       @default(now())
+  id            String         @id @default(uuid())
+  workspaceId   String?
+  workspace     Workspace?     @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  projectId     String
+  project       Project        @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  periodId      String?
+  period        ProjectPeriod? @relation(fields: [periodId], references: [id], onDelete: Restrict)
+  title         String
+  kind          WorkItemKind   @default(TASK)
+  priority      WorkPriority   @default(NORMAL)
+  dueDate       DateTime?      @db.Date
+  responsibleId String?
+  responsible   User?          @relation("WorkItemResponsible", fields: [responsibleId], references: [id], onDelete: Restrict)
+  needsReview   Boolean        @default(false)
+  recurring     Boolean        @default(false)
+  completedAt   DateTime?
+  createdAt     DateTime       @default(now())
 
   @@index([projectId, periodId])
   @@index([workspaceId])
+  @@index([responsibleId])
   @@map("work_items")
 }
 

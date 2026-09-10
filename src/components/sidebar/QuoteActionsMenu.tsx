@@ -118,11 +118,11 @@ export default function QuoteActionsMenu({
           aria-label="Más acciones"
           aria-haspopup="menu"
           aria-expanded={isOpen}
-          className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors duration-150 ${
+          className={`flex h-10 w-10 items-center justify-center rounded-md transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-accent/40 ${
             isOpen ? "bg-foreground/10 text-foreground" : "text-muted-foreground hover:bg-foreground/10 hover:text-foreground"
           }`}
         >
-          <MoreHorizontal className="h-3.5 w-3.5" strokeWidth={2} />
+          <MoreHorizontal className="h-5 w-5" strokeWidth={2} />
         </button>
       </div>
 

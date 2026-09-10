@@ -1,9 +1,9 @@
 import { MapPin } from "lucide-react";
 import { formatTime } from "@/lib/dashboard-agenda-dates";
 import { EVENT_TYPE_CONFIG } from "@/lib/event-type";
-import type { EventSnapshot } from "@/lib/event-presenter";
+import type { AgendaItemSnapshot } from "@/lib/event-presenter";
 
-export default function DayView({ events }: { events: EventSnapshot[] }) {
+export default function DayView({ events }: { events: AgendaItemSnapshot[] }) {
   if (events.length === 0) {
     return (
       <div className="liquid-glass rounded-2xl p-8 text-center">
