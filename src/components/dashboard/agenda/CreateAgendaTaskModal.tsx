@@ -1,0 +1,16 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import { CheckSquare2 } from "lucide-react";
+import Modal from "@/components/ui/Modal";
+import Button from "@/components/ui/Button";
+import Select from "@/components/ui/Select";
+import { createWorkTask } from "@/app/(dashboard)/trabajo/actions";
+
+const input = "border-surface-border bg-surface-solid/60 focus-visible:ring-accent/40 w-full rounded-lg border px-3 py-2 text-sm outline-none focus-visible:ring-2";
+
+export default function CreateAgendaTaskModal({ isOpen, onClose, onCreated, date, time, projects, members }: { isOpen: boolean; onClose: () => void; onCreated: () => void; date?: string; time?: string; projects: { id: string; name: string }[]; members: { id: string; name: string }[] }) {
+  const [error, setError] = useState<string | null>(null); const [pending, start] = useTransition();
+  function save(form: FormData) { setError(null); start(async () => { const result = await createWorkTask({ title: String(form.get("title") ?? ""), projectId: String(form.get("projectId") ?? "") || null, responsibleId: String(form.get("responsibleId") ?? "") || null, dueDate: String(form.get("date") ?? "") || null, dueTime: String(form.get("time") ?? "") || null, needsReview: form.get("needsReview") === "on" }); if (result.error) { setError(result.error); return; } onCreated(); onClose(); }); }
+  return <Modal isOpen={isOpen} onClose={onClose} className="max-w-lg"><form action={save}>{error ? <p role="alert" className="mb-3 text-sm text-red-400">{error}</p> : null}<div className="flex items-start gap-3"><div className="bg-accent-soft flex h-10 w-10 items-center justify-center rounded-xl"><CheckSquare2 className="h-5 w-5" /></div><div><h2 className="font-semibold">Nueva tarea</h2><p className="text-muted-foreground text-sm">Se guardará en Trabajo y aparecerá en Agenda.</p></div></div><div className="mt-5 grid gap-4 sm:grid-cols-2"><label className="text-sm sm:col-span-2">Título<input name="title" required autoFocus className={`${input} mt-1`} /></label><label className="text-sm">Proyecto<Select name="projectId" className={`${input} mt-1`}><option value="">Tarea interna</option>{projects.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}</Select></label><label className="text-sm">Responsable<Select name="responsibleId" defaultValue={members.length === 1 ? members[0]?.id : ""} className={`${input} mt-1`}><option value="">Asignación automática</option>{members.map(member => <option key={member.id} value={member.id}>{member.name}</option>)}</Select></label><label className="text-sm">Fecha<input name="date" type="date" defaultValue={date ?? ""} className={`${input} mt-1`} /></label><label className="text-sm">Hora opcional<input name="time" type="time" defaultValue={time ?? ""} className={`${input} mt-1`} /></label><label className="flex cursor-pointer items-center gap-2 text-sm sm:col-span-2"><input name="needsReview" type="checkbox" />Requiere revisión</label></div><div className="mt-6 flex justify-end gap-2"><Button type="button" variant="ghost" onClick={onClose} disabled={pending}>Cancelar</Button><Button type="submit" disabled={pending}>{pending ? "Creando…" : "Crear tarea"}</Button></div></form></Modal>;
+}

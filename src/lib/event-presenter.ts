@@ -9,11 +9,16 @@ export type EventInput = {
   type: EventType;
   startAt: Date;
   endAt: Date;
+  allDay?: boolean;
+  responsibleId?: string | null;
+  responsible?: { id: string; displayName: string } | null;
   location: string | null;
   notes: string | null;
   clientId: string | null;
   client: { id: string; name: string } | null;
   projectId: string | null;
+  quoteId?: string | null;
+  periodId?: string | null;
   project: { id: string; name: string } | null;
 };
 
@@ -27,6 +32,7 @@ export type AgendaItemSnapshot = EventSnapshot & {
   taskId?: string | null;
   taskStatus?: "PENDING" | "IN_PROGRESS" | "IN_REVIEW" | "COMPLETED" | null;
   taskNeedsReview?: boolean | null;
+  periodId?: string | null;
 };
 
 export function serializeEvent(event: EventInput) {
@@ -36,11 +42,16 @@ export function serializeEvent(event: EventInput) {
     type: event.type,
     startAt: event.startAt.toISOString(),
     endAt: event.endAt.toISOString(),
+    allDay: event.allDay ?? false,
+    responsibleId: event.responsibleId ?? null,
+    responsible: event.responsible ?? null,
     location: event.location,
     notes: event.notes,
     clientId: event.clientId,
     client: event.client,
     projectId: event.projectId,
     project: event.project,
+    quoteId: event.quoteId ?? null,
+    periodId: event.periodId ?? null,
   };
 }

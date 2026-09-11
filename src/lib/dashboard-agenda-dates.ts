@@ -1,3 +1,5 @@
+import { madridDate } from "@/lib/agenda-time";
+
 // Utilidades de fecha para Agenda comercial (dashboard) — cálculo de grillas
 // de mes/semana con Date nativo, sin librerías. Independiente de
 // src/lib/agenda-dates.ts (que pertenece a la agenda interna de Presupuestos
@@ -23,7 +25,7 @@ export function startOfDay(date: Date): Date {
 
 /** Clave estable para agrupar eventos por día en un Map. */
 export function dayKey(date: Date): string {
-  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+  return madridDate(date);
 }
 
 export function isSameDay(a: Date, b: Date): boolean {

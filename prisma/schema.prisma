@@ -147,6 +147,7 @@ model User {
   quotes               Quote[]
   projects             Project[]
   events               Event[]
+  responsibleEvents    Event[]              @relation("EventResponsible")
   assignments          WorkAssignment[]
   recordedPayments     Payment[]
   responsibleProjects  Project[]            @relation("ProjectResponsible")
@@ -502,10 +503,13 @@ model Event {
   workspace         Workspace?     @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
   userId            String
   user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  responsibleId     String?
+  responsible       User?          @relation("EventResponsible", fields: [responsibleId], references: [id], onDelete: Restrict)
   title             String
   type              EventType      @default(MEETING)
   startAt           DateTime
   endAt             DateTime
+  allDay            Boolean        @default(false)
   location          String?
   notes             String?        @db.Text
   clientId          String?
@@ -521,6 +525,7 @@ model Event {
   updatedAt         DateTime       @updatedAt
 
   @@index([workspaceId])
+  @@index([workspaceId, responsibleId])
   @@index([quoteId])
   @@map("events")
 }
@@ -583,9 +588,11 @@ model WorkItem {
   description     String?          @db.Text
   status          TaskStatus       @default(PENDING)
   startDate       DateTime?        @db.Date
+  startTime       String?
   kind            WorkItemKind     @default(TASK)
   priority        WorkPriority     @default(NORMAL)
   dueDate         DateTime?        @db.Date
+  dueTime         String?
   responsibleId   String?
   responsible     User?            @relation("WorkItemResponsible", fields: [responsibleId], references: [id], onDelete: Restrict)
   needsReview     Boolean          @default(false)

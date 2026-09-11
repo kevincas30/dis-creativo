@@ -6,6 +6,7 @@ import Modal from "@/components/ui/Modal";
 import Button from "@/components/ui/Button";
 import { EVENT_TYPE_CONFIG, EVENT_TYPE_ORDER } from "@/lib/event-type";
 import { toDateInputValue } from "@/lib/dashboard-agenda-dates";
+import { madridDate, madridTime } from "@/lib/agenda-time";
 import { createEvent, updateEvent } from "@/app/(dashboard)/agenda/actions";
 import type { EventSnapshot } from "@/lib/event-presenter";
 import type { EventType } from "@/generated/prisma/enums";
@@ -35,6 +36,8 @@ export default function CreateEventModal({
   defaultPeriodId,
   defaultType,
   event,
+  members = [],
+  quotes = [],
   onCreated,
 }: {
   isOpen: boolean;
@@ -47,6 +50,8 @@ export default function CreateEventModal({
   defaultPeriodId?: string;
   defaultType?: EventType;
   event?: EventSnapshot | null;
+  members?: { id: string; name: string }[];
+  quotes?: { id: string; clientId: string | null; createdAt: string }[];
   onCreated: (event: EventSnapshot) => void;
 }) {
   const [error, setError] = useState<string | null>(null);
@@ -57,6 +62,7 @@ export default function CreateEventModal({
       try {
       if (defaultProjectId) formData.set("projectId", defaultProjectId);
       if (defaultPeriodId) formData.set("periodId", defaultPeriodId);
+      if (event?.periodId) formData.set("periodId", event.periodId);
       const created = event ? await updateEvent(event.id, formData) : await createEvent(formData);
       onCreated(created);
       onClose();
@@ -105,6 +111,13 @@ export default function CreateEventModal({
               </select>
             </Field>
 
+            <Field label="Responsable" htmlFor="responsibleId">
+              <select id="responsibleId" name="responsibleId" defaultValue={event?.responsibleId ?? (members.length === 1 ? members[0]?.id : "")} className={inputClassName}>
+                <option value="">Asignación automática</option>
+                {members.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}
+              </select>
+            </Field>
+
             <Field label="Proyecto (opcional)" htmlFor="projectId">
               <select id="projectId" name="projectId" defaultValue={event?.projectId ?? defaultProjectId ?? ""} disabled={!!defaultProjectId} className={inputClassName}>
                 <option value="">Sin proyecto</option>
@@ -116,18 +129,27 @@ export default function CreateEventModal({
               </select>
             </Field>
 
+            <Field label="Presupuesto (opcional)" htmlFor="quoteId">
+              <select id="quoteId" name="quoteId" defaultValue={event?.quoteId ?? ""} className={inputClassName}>
+                <option value="">Sin presupuesto</option>
+                {quotes.map((quote) => <option key={quote.id} value={quote.id}>{quote.id.slice(0, 8)} · {quote.createdAt.slice(0, 10)}</option>)}
+              </select>
+            </Field>
+
             <Field label="Fecha" htmlFor="date">
-              <input id="date" name="date" type="date" required defaultValue={event ? toDateInputValue(new Date(event.startAt)) : defaultDate ?? toDateInputValue(new Date())} className={inputClassName} />
+              <input id="date" name="date" type="date" required defaultValue={event ? madridDate(new Date(event.startAt)) : defaultDate ?? toDateInputValue(new Date())} className={inputClassName} />
             </Field>
 
             <Field label="Hora inicio" htmlFor="startTime">
-              <input id="startTime" name="startTime" type="time" required defaultValue={event ? new Date(event.startAt).toTimeString().slice(0, 5) : "10:00"} className={inputClassName} />
+              <input id="startTime" name="startTime" type="time" required defaultValue={event ? madridTime(new Date(event.startAt)) : "10:00"} className={inputClassName} />
             </Field>
 
             <Field label="Hora fin" htmlFor="endTime">
-              <input id="endTime" name="endTime" type="time" required defaultValue={event ? new Date(event.endAt).toTimeString().slice(0, 5) : "11:00"} className={inputClassName} />
+              <input id="endTime" name="endTime" type="time" required defaultValue={event ? madridTime(new Date(event.endAt)) : "11:00"} className={inputClassName} />
             </Field>
           </div>
+
+          <label className="flex cursor-pointer items-center gap-2 text-sm"><input name="allDay" type="checkbox" defaultChecked={event?.allDay ?? false} />Todo el día</label>
 
           <Field label="Ubicación o enlace" htmlFor="location">
             <input id="location" name="location" defaultValue={event?.location ?? ""} placeholder="Oficina, Google Meet..." className={inputClassName} />

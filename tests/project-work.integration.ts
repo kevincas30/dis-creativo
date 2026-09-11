@@ -17,14 +17,17 @@ import { addTaskComment, createTask, deleteTask, deleteTaskComment, editTaskComm
 async function main() {
   const pg = new PGlite();
   const migrations = (await readdir("prisma/migrations")).filter((name) => /^\d/.test(name)).sort();
-  for (const name of migrations.slice(0, -1)) await pg.exec(await readFile(`prisma/migrations/${name}/migration.sql`, "utf8"));
+  const taskMigration = migrations.indexOf("20260911120000_add_collaborative_task_workflow");
+  if (taskMigration < 0) throw new Error("task migration missing");
+  for (const name of migrations.slice(0, taskMigration)) await pg.exec(await readFile(`prisma/migrations/${name}/migration.sql`, "utf8"));
   await pg.exec(`INSERT INTO users (id,email,"displayName","updatedAt") VALUES ('owner','owner@test.invalid','Owner',now()),('other','other@test.invalid','Other',now());
     INSERT INTO clients (id,name,"updatedAt") VALUES ('client','Legacy client',now());
     INSERT INTO projects (id,"userId",name,client,status,progress,"updatedAt") VALUES ('legacy','owner','Legacy project','Legacy client','DONE',80,now());
     INSERT INTO quotes (id,"userId","clientId",status,"updatedAt") VALUES ('quote','owner','client','PAID',now());`);
   const before = await pg.query('SELECT id,name,status,progress,client FROM projects');
-  await pg.exec(await readFile(`prisma/migrations/${migrations.at(-1)}/migration.sql`, "utf8"));
-  assert.deepEqual(await pg.query('SELECT id,name,status,progress,client FROM projects'), before, "migration preserves all original project values");
+  await pg.exec(await readFile(`prisma/migrations/${migrations[taskMigration]}/migration.sql`, "utf8"));
+  assert.deepEqual(await pg.query('SELECT id,name,status,progress,client FROM projects'), before, "task migration preserves all original project values");
+  for (const name of migrations.slice(taskMigration + 1)) await pg.exec(await readFile(`prisma/migrations/${name}/migration.sql`, "utf8"));
   const server = new PGLiteSocketServer({ db: pg, host: "127.0.0.1", port: 0 });
   await server.start();
   const conn = `postgresql://postgres@${server.getServerConn()}/postgres`;
@@ -48,10 +51,12 @@ async function main() {
     ] });
     await db.client.update({ where: { id: "client" }, data: { workspaceId: "workspace" } });
     await db.quote.update({ where: { id: "quote" }, data: { workspaceId: "workspace" } });
-    const internal = await createTask(db, ownerActor, { title: "Cerrar el estudio", dueDate: "2026-09-10" });
-    assert.equal(internal.projectId, null); assert.equal(internal.responsibleId, "owner"); assert.equal(internal.status, "PENDING");
+    const internal = await createTask(db, ownerActor, { title: "Cerrar el estudio", dueDate: "2026-09-10", dueTime: "10:30" });
+    assert.equal(internal.projectId, null); assert.equal(internal.responsibleId, "owner"); assert.equal(internal.status, "PENDING"); assert.equal(internal.dueTime, "10:30");
     const taskAgenda = await getProjectAgendaItems(db, "workspace");
-    assert.ok(taskAgenda.some(item => item.id === `task-due-${internal.id}` && item.agendaKind === "TASK_DUE" && item.href === `/trabajo?task=${internal.id}`));
+    assert.ok(taskAgenda.some(item => item.id === `task-due-${internal.id}` && item.agendaKind === "TASK_DUE" && item.href === `/trabajo?task=${internal.id}` && item.allDay === false));
+    const allDayEvent = await db.event.create({ data: { id: "all-day", workspaceId: "workspace", userId: "owner", responsibleId: "owner", title: "Día completo", type: "REMINDER", startAt: new Date("2026-09-10T00:00:00Z"), endAt: new Date("2026-09-11T00:00:00Z"), allDay: true } });
+    assert.equal(allDayEvent.responsibleId, "owner"); assert.equal(allDayEvent.allDay, true);
     const inProject = await createTask(db, memberActor, { title: "Ajustar portada", projectId: "legacy" }).catch(() => null);
     assert.equal(inProject, null, "a project outside the workspace cannot be selected by ID");
     await transitionTask(db, ownerActor, internal.id, "COMPLETE");
