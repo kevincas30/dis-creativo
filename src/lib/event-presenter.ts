@@ -20,7 +20,7 @@ export type EventInput = {
 export type EventSnapshot = ReturnType<typeof serializeEvent>;
 
 export type AgendaItemSnapshot = EventSnapshot & {
-  agendaKind?: "EVENT" | "PROJECT_START" | "PROJECT_DUE";
+  agendaKind?: "EVENT" | "PROJECT_START" | "PROJECT_DUE" | "TASK_START" | "TASK_DUE";
   href?: string | null;
   allDay?: boolean;
 };

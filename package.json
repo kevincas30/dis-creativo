@@ -19,7 +19,8 @@
     "backfill:quotes-phase2": "tsx scripts/backfill-quote-phase2.ts",
     "test:quotes": "tsx tests/quote-workflow.integration.ts",
     "test:client-form": "tsx --test src/components/dashboard/clientes/client-form-utils.test.ts",
-    "backfill:project-phase3": "node --env-file=.env --import tsx scripts/backfill-project-phase3.ts"
+    "backfill:project-phase3": "node --env-file=.env --import tsx scripts/backfill-project-phase3.ts",
+    "backfill:tasks-phase4": "node --env-file=.env --import tsx scripts/backfill-task-phase4.ts"
   },
   "dependencies": {
     "@google/genai": "^2.13.0",

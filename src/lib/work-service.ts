@@ -198,7 +198,7 @@ export async function runWorkCommand(db: PrismaClient, actor: WorkspaceActor, pr
         const title = textField(form, "title", true)!;
         const responsibleId = textField(form, "responsibleId");
         if (responsibleId && !await tx.workspaceMember.findFirst({ where: { workspaceId: actor.workspaceId, userId: responsibleId } })) throw new Error("La persona responsable no pertenece al workspace actual.");
-        await tx.workItem.create({ data: { workspaceId: actor.workspaceId, ...where, title, kind: kind as never, priority: priority as never, dueDate: dateField(form, "dueDate"), responsibleId, needsReview: form.get("needsReview") === "on", recurring: form.get("recurring") === "on" } });
+        await tx.workItem.create({ data: { workspaceId: actor.workspaceId, createdById: actor.userId, ...where, title, kind: kind as never, priority: priority as never, dueDate: dateField(form, "dueDate"), responsibleId, needsReview: form.get("needsReview") === "on", recurring: form.get("recurring") === "on" } });
         await record("WORK_CREATED", `${kind === "TASK" ? "Tarea" : "Entregable"} creado: ${title}`);
         return;
       }
@@ -207,8 +207,9 @@ export async function runWorkCommand(db: PrismaClient, actor: WorkspaceActor, pr
         const item = await tx.workItem.findFirst({ where: { ...where, id: textField(form, "itemId", true)! } });
         if (!item) throw new Error("Trabajo no encontrado.");
         const completed = form.get("completed") === "true";
+        if (completed && item.needsReview) throw new Error("Esta tarea requiere revisión. Envíala a revisión desde Trabajo.");
         if (Boolean(item.completedAt) === completed) return;
-        await tx.workItem.update({ where: { id: item.id }, data: { completedAt: completed ? new Date() : null } });
+        await tx.workItem.update({ where: { id: item.id }, data: { completedAt: completed ? new Date() : null, status: completed ? "COMPLETED" : "PENDING" } });
         await record("WORK_CHANGED", `${completed ? "Completado" : "Reabierto"}: ${item.title}`);
         return;
       }

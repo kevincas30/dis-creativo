@@ -83,7 +83,7 @@ export async function prepareProjectFromQuote(db: PrismaClient, actor: Workspace
     } }) : null;
     if (tasks.length) await tx.workItem.createMany({ data: tasks.map((task) => ({
       workspaceId: actor.workspaceId, projectId: created.id, periodId: period?.id ?? null, title: task.title,
-      dueDate: task.dueDate, responsibleId: task.responsibleId ?? raw.responsibleId, needsReview: Boolean(task.needsReview),
+      dueDate: task.dueDate, responsibleId: task.responsibleId ?? raw.responsibleId, createdById: actor.userId, needsReview: Boolean(task.needsReview),
     })) });
     await tx.workAssignment.create({ data: { projectId: created.id, periodId: period?.id ?? null, userId: raw.responsibleId } });
     await tx.activityRecord.create({ data: {

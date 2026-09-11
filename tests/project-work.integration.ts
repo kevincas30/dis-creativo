@@ -11,6 +11,7 @@ import { isActiveProject } from "../src/lib/project-status";
 import { projectAttention } from "../src/lib/workspace-summary";
 import { prepareProjectFromQuote } from "../src/lib/project-preparation-service";
 import { getProjectAgendaItems } from "../src/lib/project-agenda-items";
+import { addTaskComment, createTask, deleteTaskComment, editTaskComment, transitionTask } from "../src/lib/task-service";
 
 // Always creates an isolated in-memory PostgreSQL instance. Never reads DATABASE_URL.
 async function main() {
@@ -47,6 +48,28 @@ async function main() {
     ] });
     await db.client.update({ where: { id: "client" }, data: { workspaceId: "workspace" } });
     await db.quote.update({ where: { id: "quote" }, data: { workspaceId: "workspace" } });
+    const internal = await createTask(db, ownerActor, { title: "Cerrar el estudio", dueDate: "2026-09-10" });
+    assert.equal(internal.projectId, null); assert.equal(internal.responsibleId, "owner"); assert.equal(internal.status, "PENDING");
+    const taskAgenda = await getProjectAgendaItems(db, "workspace");
+    assert.ok(taskAgenda.some(item => item.id === `task-due-${internal.id}` && item.agendaKind === "TASK_DUE" && item.href === `/trabajo?task=${internal.id}`));
+    const inProject = await createTask(db, memberActor, { title: "Ajustar portada", projectId: "legacy" }).catch(() => null);
+    assert.equal(inProject, null, "a project outside the workspace cannot be selected by ID");
+    await transitionTask(db, ownerActor, internal.id, "COMPLETE");
+    assert.equal((await db.workItem.findUniqueOrThrow({ where: { id: internal.id } })).status, "COMPLETED");
+    const review = await createTask(db, ownerActor, { title: "Revisar propuesta", needsReview: true });
+    await transitionTask(db, ownerActor, review.id, "START"); await transitionTask(db, ownerActor, review.id, "SEND_REVIEW");
+    await assert.rejects(transitionTask(db, ownerActor, review.id, "REQUEST_CHANGES"), /comentario/);
+    await transitionTask(db, memberActor, review.id, "REQUEST_CHANGES", "Ajusta el contraste del título.");
+    assert.equal((await db.workItem.findUniqueOrThrow({ where: { id: review.id } })).status, "IN_PROGRESS"); assert.equal(await db.taskComment.count({ where: { workItemId: review.id } }), 1);
+    await transitionTask(db, ownerActor, review.id, "SEND_REVIEW"); await transitionTask(db, memberActor, review.id, "APPROVE");
+    const note = await addTaskComment(db, ownerActor, internal.id, "Checklist completado.");
+    await assert.rejects(editTaskComment(db, memberActor, note.id, "No debería editarse."), /propios/);
+    await editTaskComment(db, ownerActor, note.id, "Checklist revisado.");
+    await deleteTaskComment(db, ownerActor, note.id);
+    assert.equal(await db.taskComment.count({ where: { id: note.id } }), 0);
+    await assert.rejects(addTaskComment(db, { ...ownerActor, workspaceId: "other-workspace" }, internal.id, "No permitido."), /acceso/);
+    assert.ok(note.id);
+    check("internal and project tasks use WorkItem, auto-assign one member, enforce review comments and isolate workspaces");
     await db.quote.create({ data: { id: "approved", workspaceId: "workspace", userId: "owner", clientId: "client", responsibleId: "owner", currency: "EUR", status: "ACCEPTED", total: "200", depositKind: "PERCENTAGE", depositValue: "50", lineItems: { create: [{ description: "Branding", quantity: "1", unitPrice: "200", lineTotal: "200" }] } } });
     const projectsBeforePreparation = await db.project.count();
     const prepared = await prepareProjectFromQuote(db, ownerActor, { quoteId: "approved", name: "Branding launch", kind: "RECURRING", startDate: "2026-09-01", dueDate: "2026-09-30", agreedTotal: "200", depositExpected: "100", responsibleId: "owner", tasks: [{ title: "Diseñar identidad", responsibleId: "other", dueDate: "2026-09-10", needsReview: true }] });

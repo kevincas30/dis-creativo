@@ -11,7 +11,7 @@ const QUICK_ACCESS: QuickAccess[] = [
   { icon: Calendar, label: "Agenda comercial", description: "Reuniones y seguimientos", href: "/agenda" },
   { icon: Users, label: "Clientes", description: "Directorio del estudio", href: "/clientes" },
   { icon: FolderKanban, label: "Proyectos", description: "Seguimiento de entregas", href: "/projects" },
-  { icon: ListChecks, label: "Tareas", description: "Pendientes del equipo", href: "/tasks" },
+  { icon: ListChecks, label: "Trabajo", description: "Pendientes del equipo", href: "/trabajo" },
   { icon: CreditCard, label: "Pagos", description: "Cobros y facturas", href: "/payments" },
 ];
 

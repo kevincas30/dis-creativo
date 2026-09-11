@@ -109,7 +109,7 @@ export default async function DashboardHome() {
                 })}
               </ul>
             )}
-            <div className="border-surface-border mt-4 border-t pt-4"><Link href="/tasks" className={TEXT_LINK}>Tareas de hoy y atrasadas</Link><WorkList items={tasks.map((w) => ({ ...w, dueDate: w.dueDate?.toISOString() ?? null, completedAt: w.completedAt?.toISOString() ?? null }))} /></div>
+            <div className="border-surface-border mt-4 border-t pt-4"><Link href="/trabajo" className={TEXT_LINK}>Tareas de hoy y atrasadas</Link><WorkList items={tasks.map((w) => ({ ...w, dueDate: w.dueDate?.toISOString() ?? null, completedAt: w.completedAt?.toISOString() ?? null }))} /></div>
           </section>
 
           <section aria-labelledby="projects-heading" className="liquid-glass animate-fade-in-up min-w-0 rounded-2xl p-5 sm:p-6">

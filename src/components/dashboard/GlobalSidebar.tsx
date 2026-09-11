@@ -51,7 +51,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Inicio", href: "/", icon: Home, isActive: (p) => p === "/" },
   { label: "Clientes", href: "/clientes", icon: Users, isActive: (p) => p.startsWith("/clientes") },
   { label: "Proyectos", href: "/projects", icon: FolderKanban, isActive: (p) => p.startsWith("/projects") },
-  { label: "Tareas", href: "/tasks", icon: ListChecks, isActive: (p) => p.startsWith("/tasks") },
+  { label: "Trabajo", href: "/trabajo", icon: ListChecks, isActive: (p) => p.startsWith("/trabajo") || p.startsWith("/tasks") },
   {
     label: "Presupuestos",
     href: "/presupuestos",

@@ -148,10 +148,12 @@ export async function inspectWorkspaceGraph(transaction: Prisma.TransactionClien
   }
   for (const period of periods) if (!projectsById.has(period.projectId)) addIssue(issues, "PERIOD_PROJECT_ORPHAN");
   for (const item of workItems) {
-    const project = projectsById.get(item.projectId);
-    if (!project) addIssue(issues, "WORK_PROJECT_ORPHAN");
-    else checkScopedRelation(rootScope(item.workspaceId), project.workspaceId, "WORK_PROJECT");
-    checkPeriod(item.projectId, item.periodId, "WORK");
+    if (item.projectId) {
+      const project = projectsById.get(item.projectId);
+      if (!project) addIssue(issues, "WORK_PROJECT_ORPHAN");
+      else checkScopedRelation(rootScope(item.workspaceId), project.workspaceId, "WORK_PROJECT");
+      checkPeriod(item.projectId, item.periodId, "WORK");
+    } else if (item.periodId) addIssue(issues, "WORK_PERIOD_WITHOUT_PROJECT");
   }
   for (const assignment of assignments) {
     if (!projectsById.has(assignment.projectId)) addIssue(issues, "ASSIGNMENT_PROJECT_ORPHAN");

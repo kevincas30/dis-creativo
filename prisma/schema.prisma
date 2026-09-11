@@ -90,6 +90,13 @@ enum WorkPriority {
   HIGH
 }
 
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  IN_REVIEW
+  COMPLETED
+}
+
 enum EventType {
   MEETING
   DELIVERY
@@ -144,6 +151,8 @@ model User {
   recordedPayments     Payment[]
   responsibleProjects  Project[]            @relation("ProjectResponsible")
   responsibleWorkItems WorkItem[]           @relation("WorkItemResponsible")
+  createdWorkItems     WorkItem[]           @relation("WorkItemCreatedBy")
+  taskComments         TaskComment[]
   activityRecords      ActivityRecord[]
   workspaceMembers     WorkspaceMember[]
   responsibleClients   Client[]             @relation("ClientResponsible")
@@ -563,28 +572,53 @@ model Payment {
 }
 
 model WorkItem {
-  id            String         @id @default(uuid())
-  workspaceId   String?
-  workspace     Workspace?     @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
-  projectId     String
-  project       Project        @relation(fields: [projectId], references: [id], onDelete: Restrict)
-  periodId      String?
-  period        ProjectPeriod? @relation(fields: [periodId], references: [id], onDelete: Restrict)
-  title         String
-  kind          WorkItemKind   @default(TASK)
-  priority      WorkPriority   @default(NORMAL)
-  dueDate       DateTime?      @db.Date
-  responsibleId String?
-  responsible   User?          @relation("WorkItemResponsible", fields: [responsibleId], references: [id], onDelete: Restrict)
-  needsReview   Boolean        @default(false)
-  recurring     Boolean        @default(false)
-  completedAt   DateTime?
-  createdAt     DateTime       @default(now())
+  id              String           @id @default(uuid())
+  workspaceId     String?
+  workspace       Workspace?       @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  projectId       String?
+  project         Project?         @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  periodId        String?
+  period          ProjectPeriod?   @relation(fields: [periodId], references: [id], onDelete: Restrict)
+  title           String
+  description     String?          @db.Text
+  status          TaskStatus       @default(PENDING)
+  startDate       DateTime?        @db.Date
+  kind            WorkItemKind     @default(TASK)
+  priority        WorkPriority     @default(NORMAL)
+  dueDate         DateTime?        @db.Date
+  responsibleId   String?
+  responsible     User?            @relation("WorkItemResponsible", fields: [responsibleId], references: [id], onDelete: Restrict)
+  needsReview     Boolean          @default(false)
+  recurring       Boolean          @default(false)
+  completedAt     DateTime?
+  createdById     String?
+  createdBy       User?            @relation("WorkItemCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  archivedAt      DateTime?
+  createdAt       DateTime         @default(now())
+  comments        TaskComment[]
+  activityRecords ActivityRecord[]
 
   @@index([projectId, periodId])
   @@index([workspaceId])
   @@index([responsibleId])
+  @@index([workspaceId, status])
+  @@index([workspaceId, responsibleId, status])
   @@map("work_items")
+}
+
+model TaskComment {
+  id         String   @id @default(uuid())
+  workItemId String
+  workItem   WorkItem @relation(fields: [workItemId], references: [id], onDelete: Restrict)
+  authorId   String
+  author     User     @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  content    String   @db.Text
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([workItemId, createdAt])
+  @@index([authorId])
+  @@map("task_comments")
 }
 
 model WorkAssignment {
@@ -613,6 +647,8 @@ model ActivityRecord {
   period      ProjectPeriod? @relation(fields: [periodId], references: [id], onDelete: Restrict)
   clientId    String?
   client      Client?        @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  workItemId  String?
+  workItem    WorkItem?      @relation(fields: [workItemId], references: [id], onDelete: Restrict)
   action      String
   description String
   createdAt   DateTime       @default(now())
@@ -620,5 +656,6 @@ model ActivityRecord {
   @@index([projectId, periodId, createdAt])
   @@index([clientId, createdAt])
   @@index([workspaceId])
+  @@index([workItemId, createdAt])
   @@map("activity_records")
 }
