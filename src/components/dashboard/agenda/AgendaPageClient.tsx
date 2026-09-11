@@ -67,8 +67,8 @@ export default function AgendaPageClient({
   useMobileHeaderAction(
     <button
       type="button"
-      onClick={() => setIsCreateOpen(true)}
-      aria-label="Nuevo evento"
+      onClick={() => setContextMenu({ x: 220, y: 96, date: toDateInputValue(selectedDay), item: null })}
+      aria-label="Crear en agenda"
       className="shadow-soft flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 text-white transition-transform duration-150 active:scale-[0.92]"
     >
       <Plus className="h-4 w-4" strokeWidth={2.25} />
