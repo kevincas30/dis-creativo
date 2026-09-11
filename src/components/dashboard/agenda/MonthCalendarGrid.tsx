@@ -10,12 +10,16 @@ export default function MonthCalendarGrid({
   eventsByDay,
   selectedDay,
   onSelectDay,
+  onContextMenu,
+  onOpenItem,
 }: {
   days: Date[];
   referenceDate: Date;
   eventsByDay: Map<string, AgendaItemSnapshot[]>;
   selectedDay: Date;
   onSelectDay: (date: Date) => void;
+  onContextMenu?: (event: React.MouseEvent | React.KeyboardEvent, item: AgendaItemSnapshot | null, date: Date) => void;
+  onOpenItem?: (item: AgendaItemSnapshot) => void;
 }) {
   const today = new Date();
 
@@ -40,10 +44,13 @@ export default function MonthCalendarGrid({
           const extraCount = dayEvents.length - visibleEvents.length;
 
           return (
-            <button
-              type="button"
+            <div
+              role="button"
+              tabIndex={0}
               key={key}
               onClick={() => onSelectDay(day)}
+              onContextMenu={(event) => onContextMenu?.(event, null, day)}
+              onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelectDay(day); } if ((event.shiftKey && event.key === "F10") || event.key === "ContextMenu") { event.preventDefault(); onContextMenu?.(event, null, day); } }}
               className={`border-surface-border hover:bg-foreground/5 flex min-h-24 w-full flex-col gap-1 border-r border-b p-1.5 text-left transition-colors duration-150 last:border-r-0 ${
                 isSelected ? "bg-accent-soft" : ""
               }`}
@@ -58,11 +65,11 @@ export default function MonthCalendarGrid({
 
               <div className="space-y-1">
                 {visibleEvents.map((event) => (
-                  <EventChip key={event.id} event={event} />
+                  <EventChip key={event.id} event={event} onOpen={onOpenItem} onContextMenu={(click, item) => onContextMenu?.(click, item, day)} />
                 ))}
                 {extraCount > 0 ? <p className="text-muted-foreground px-1 text-[11px]">+{extraCount} más</p> : null}
               </div>
-            </button>
+            </div>
           );
         })}
       </div>

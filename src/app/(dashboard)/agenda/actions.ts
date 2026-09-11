@@ -91,3 +91,30 @@ export async function createEvent(formData: FormData) {
 
   return serializeEvent(event);
 }
+
+export async function updateEvent(id: string, formData: FormData) {
+  const context = await requireWorkspaceMembership();
+  const { workspace } = context;
+  const existing = await prisma.event.findFirst({ where: { id, workspaceId: workspace.id }, select: { id: true } });
+  if (!existing) throw new Error("Evento no encontrado o sin acceso.");
+  const title = readText(formData, "title"); const date = readText(formData, "date"); const startTime = readText(formData, "startTime"); const endTime = readText(formData, "endTime");
+  if (!title || !date || !startTime || !endTime) throw new Error("Título, fecha, hora de inicio y hora de fin son obligatorios.");
+  const startAt = new Date(`${date}T${startTime}`); const endAt = new Date(`${date}T${endTime}`);
+  if (Number.isNaN(startAt.getTime()) || Number.isNaN(endAt.getTime()) || endAt <= startAt) throw new Error("Fecha u hora inválida.");
+  let clientId = readText(formData, "clientId"); const projectId = readText(formData, "projectId");
+  const project = projectId ? await prisma.project.findFirst({ where: { id: projectId, workspaceId: workspace.id, archivedAt: null } }) : null;
+  if (projectId && !project) throw new Error("Proyecto no disponible.");
+  if (project?.clientId) { if (clientId && clientId !== project.clientId) throw new Error("El cliente no corresponde al proyecto."); clientId = project.clientId; }
+  if (clientId && !await prisma.client.findFirst({ where: { id: clientId, workspaceId: workspace.id, archivedAt: null } })) throw new Error("Cliente no disponible.");
+  const event = await prisma.event.update({ where: { id }, data: { title, type: readType(formData), startAt, endAt, location: readText(formData, "location"), notes: readText(formData, "notes"), clientId, projectId }, select: EVENT_SELECT });
+  revalidatePath("/", "layout"); revalidatePath("/agenda"); return serializeEvent(event);
+}
+
+export async function deleteAgendaEvent(id: string) {
+  const context = await requireWorkspaceMembership();
+  if (context.membership.role !== "ADMIN") throw new Error("Solo un administrador puede eliminar eventos.");
+  const event = await prisma.event.findFirst({ where: { id, workspaceId: context.workspace.id }, select: { id: true } });
+  if (!event) throw new Error("Evento no encontrado o sin acceso.");
+  await prisma.event.delete({ where: { id } });
+  revalidatePath("/", "layout"); revalidatePath("/agenda");
+}

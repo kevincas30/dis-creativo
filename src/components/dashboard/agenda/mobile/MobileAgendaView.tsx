@@ -18,7 +18,7 @@ function offsetWithin(container: HTMLElement, target: HTMLElement): number {
 // arriba y una etiqueta de mes que se sincroniza con lo que está visible.
 // Entra siempre en el mes actual, con MONTHS_BEFORE/MONTHS_AFTER meses de
 // margen a cada lado. Estado de navegación totalmente independiente del desktop.
-export default function MobileAgendaView({ eventsByDay }: { eventsByDay: Map<string, AgendaItemSnapshot[]> }) {
+export default function MobileAgendaView({ eventsByDay, onOpenItem, onMoreItem }: { eventsByDay: Map<string, AgendaItemSnapshot[]>; onOpenItem?: (event: AgendaItemSnapshot) => void; onMoreItem?: (click: React.MouseEvent, event: AgendaItemSnapshot) => void }) {
   const todayMonthStart = useMemo(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
@@ -103,7 +103,7 @@ export default function MobileAgendaView({ eventsByDay }: { eventsByDay: Map<str
       </div>
 
       {dayViewDate ? (
-        <MobileDayView date={dayViewDate} eventsByDay={eventsByDay} onClose={() => setDayViewDate(null)} onChangeDay={setDayViewDate} />
+        <MobileDayView date={dayViewDate} eventsByDay={eventsByDay} onClose={() => setDayViewDate(null)} onChangeDay={setDayViewDate} onOpenItem={onOpenItem} onMoreItem={onMoreItem} />
       ) : null}
     </div>
   );

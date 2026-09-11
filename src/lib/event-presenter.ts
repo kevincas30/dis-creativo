@@ -23,6 +23,10 @@ export type AgendaItemSnapshot = EventSnapshot & {
   agendaKind?: "EVENT" | "PROJECT_START" | "PROJECT_DUE" | "TASK_START" | "TASK_DUE";
   href?: string | null;
   allDay?: boolean;
+  /** WorkItem source for derived task dates. Persisted Events intentionally omit it. */
+  taskId?: string | null;
+  taskStatus?: "PENDING" | "IN_PROGRESS" | "IN_REVIEW" | "COMPLETED" | null;
+  taskNeedsReview?: boolean | null;
 };
 
 export function serializeEvent(event: EventInput) {

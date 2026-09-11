@@ -9,11 +9,15 @@ export default function WeekCalendarGrid({
   eventsByDay,
   selectedDay,
   onSelectDay,
+  onContextMenu,
+  onOpenItem,
 }: {
   days: Date[];
   eventsByDay: Map<string, AgendaItemSnapshot[]>;
   selectedDay: Date;
   onSelectDay: (date: Date) => void;
+  onContextMenu?: (event: React.MouseEvent | React.KeyboardEvent, item: AgendaItemSnapshot | null, date: Date) => void;
+  onOpenItem?: (item: AgendaItemSnapshot) => void;
 }) {
   const today = new Date();
 
@@ -26,10 +30,13 @@ export default function WeekCalendarGrid({
         const isSelected = isSameDay(day, selectedDay);
 
         return (
-          <button
-            type="button"
+          <div
+            role="button"
+            tabIndex={0}
             key={key}
             onClick={() => onSelectDay(day)}
+            onContextMenu={(event) => onContextMenu?.(event, null, day)}
+            onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelectDay(day); } if ((event.shiftKey && event.key === "F10") || event.key === "ContextMenu") { event.preventDefault(); onContextMenu?.(event, null, day); } }}
             className={`border-surface-border hover:bg-foreground/5 flex min-h-32 w-full flex-col gap-1.5 border-r border-b p-2 text-left transition-colors duration-150 last:border-r-0 sm:border-b-0 ${
               isSelected ? "bg-accent-soft" : ""
             }`}
@@ -49,10 +56,10 @@ export default function WeekCalendarGrid({
               {dayEvents.length === 0 ? (
                 <p className="text-muted-foreground/60 text-[11px]">Sin eventos</p>
               ) : (
-                dayEvents.map((event) => <EventChip key={event.id} event={event} />)
+                dayEvents.map((event) => <EventChip key={event.id} event={event} onOpen={onOpenItem} onContextMenu={(click, item) => onContextMenu?.(click, item, day)} />)
               )}
             </div>
-          </button>
+          </div>
         );
       })}
     </div>

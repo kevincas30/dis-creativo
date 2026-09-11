@@ -11,7 +11,7 @@ import { isActiveProject } from "../src/lib/project-status";
 import { projectAttention } from "../src/lib/workspace-summary";
 import { prepareProjectFromQuote } from "../src/lib/project-preparation-service";
 import { getProjectAgendaItems } from "../src/lib/project-agenda-items";
-import { addTaskComment, createTask, deleteTaskComment, editTaskComment, transitionTask } from "../src/lib/task-service";
+import { addTaskComment, createTask, deleteTask, deleteTaskComment, editTaskComment, transitionTask, updateTask } from "../src/lib/task-service";
 
 // Always creates an isolated in-memory PostgreSQL instance. Never reads DATABASE_URL.
 async function main() {
@@ -69,6 +69,14 @@ async function main() {
     assert.equal(await db.taskComment.count({ where: { id: note.id } }), 0);
     await assert.rejects(addTaskComment(db, { ...ownerActor, workspaceId: "other-workspace" }, internal.id, "No permitido."), /acceso/);
     assert.ok(note.id);
+    const deletable = await createTask(db, ownerActor, { title: "Tarea temporal", dueDate: "2026-09-11" });
+    await addTaskComment(db, ownerActor, deletable.id, "Comentario temporal");
+    await assert.rejects(deleteTask(db, memberActor, deletable.id), /administrador/);
+    await deleteTask(db, ownerActor, deletable.id);
+    assert.equal(await db.workItem.count({ where: { id: deletable.id } }), 0);
+    assert.equal(await db.taskComment.count({ where: { workItemId: deletable.id } }), 0);
+    assert.equal(await db.activityRecord.count({ where: { workItemId: deletable.id } }), 0);
+    check("only admins delete a task and its dependent comments and activity, leaving no orphan rows");
     check("internal and project tasks use WorkItem, auto-assign one member, enforce review comments and isolate workspaces");
     await db.quote.create({ data: { id: "approved", workspaceId: "workspace", userId: "owner", clientId: "client", responsibleId: "owner", currency: "EUR", status: "ACCEPTED", total: "200", depositKind: "PERCENTAGE", depositValue: "50", lineItems: { create: [{ description: "Branding", quantity: "1", unitPrice: "200", lineTotal: "200" }] } } });
     const projectsBeforePreparation = await db.project.count();
@@ -98,6 +106,15 @@ async function main() {
     await command("one", "dates", { startDate: "2026-09-01", dueDate: "" });
     agendaDates = await getProjectAgendaItems(db, "workspace");
     assert.equal(agendaDates.some((item) => item.projectId === "one" && item.agendaKind === "PROJECT_DUE"), false);
+    await command("one", "addWork", { title: "Entrega creada desde proyecto", kind: "DELIVERABLE", dueDate: "2026-09-12" });
+    const projectDeliverable = await db.workItem.findFirstOrThrow({ where: { projectId: "one", title: "Entrega creada desde proyecto" } });
+    agendaDates = await getProjectAgendaItems(db, "workspace");
+    assert.ok(agendaDates.some((item) => item.id === `task-due-${projectDeliverable.id}` && item.agendaKind === "TASK_DUE"), "a dated work item created from a project appears in Agenda");
+    assert.equal(await db.event.count({ where: { projectId: "one" } }), 0, "Agenda derives project work without an Event duplicate");
+    await updateTask(db, ownerActor, projectDeliverable.id, { title: "Entrega creada desde proyecto", projectId: "one", dueDate: "2026-09-13" });
+    agendaDates = await getProjectAgendaItems(db, "workspace");
+    assert.equal(agendaDates.find((item) => item.id === `task-due-${projectDeliverable.id}`)?.startAt.slice(0, 10), "2026-09-13");
+    check("a dated task or deliverable created from a project appears in Agenda using its WorkItem dates");
     check("project start and delivery appear in Agenda as derived all-day items, move with dates and never create duplicate events");
     await command("one", "status", { status: "DELIVERED" });
     let project = await db.project.findUniqueOrThrow({ where: { id: "one" } });

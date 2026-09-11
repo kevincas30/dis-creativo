@@ -6,8 +6,9 @@ import Modal from "@/components/ui/Modal";
 import Button from "@/components/ui/Button";
 import { EVENT_TYPE_CONFIG, EVENT_TYPE_ORDER } from "@/lib/event-type";
 import { toDateInputValue } from "@/lib/dashboard-agenda-dates";
-import { createEvent } from "@/app/(dashboard)/agenda/actions";
+import { createEvent, updateEvent } from "@/app/(dashboard)/agenda/actions";
 import type { EventSnapshot } from "@/lib/event-presenter";
+import type { EventType } from "@/generated/prisma/enums";
 
 const inputClassName =
   "border-surface-border bg-surface-solid/60 focus-visible:ring-accent/40 w-full rounded-lg border px-3 py-2 text-sm outline-none focus-visible:ring-2";
@@ -32,6 +33,8 @@ export default function CreateEventModal({
   defaultClientId,
   defaultProjectId,
   defaultPeriodId,
+  defaultType,
+  event,
   onCreated,
 }: {
   isOpen: boolean;
@@ -42,6 +45,8 @@ export default function CreateEventModal({
   defaultClientId?: string;
   defaultProjectId?: string;
   defaultPeriodId?: string;
+  defaultType?: EventType;
+  event?: EventSnapshot | null;
   onCreated: (event: EventSnapshot) => void;
 }) {
   const [error, setError] = useState<string | null>(null);
@@ -52,7 +57,7 @@ export default function CreateEventModal({
       try {
       if (defaultProjectId) formData.set("projectId", defaultProjectId);
       if (defaultPeriodId) formData.set("periodId", defaultPeriodId);
-      const created = await createEvent(formData);
+      const created = event ? await updateEvent(event.id, formData) : await createEvent(formData);
       onCreated(created);
       onClose();
       } catch (error) { setError(error instanceof Error ? error.message : "No se pudo crear el evento."); }
@@ -68,19 +73,19 @@ export default function CreateEventModal({
             <CalendarPlus className="text-foreground h-5 w-5" strokeWidth={1.75} />
           </div>
           <div className="min-w-0 flex-1 pt-1">
-            <h2 className="text-base font-semibold tracking-tight">Nuevo evento</h2>
-            <p className="text-muted-foreground text-sm">Agrega un evento a la agenda comercial</p>
+            <h2 className="text-base font-semibold tracking-tight">{event ? "Editar evento" : "Nuevo evento"}</h2>
+            <p className="text-muted-foreground text-sm">{event ? "Actualiza los datos de la agenda" : "Agrega un evento a la agenda comercial"}</p>
           </div>
         </div>
 
         <div className="mt-5 space-y-4">
           <Field label="Título" htmlFor="title">
-            <input id="title" name="title" required placeholder="Reunión con cliente" className={inputClassName} />
+            <input id="title" name="title" required defaultValue={event?.title} placeholder="Reunión con cliente" className={inputClassName} />
           </Field>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Tipo de evento" htmlFor="type">
-              <select id="type" name="type" defaultValue="MEETING" className={inputClassName}>
+              <select id="type" name="type" defaultValue={event?.type ?? defaultType ?? "MEETING"} className={inputClassName}>
                 {EVENT_TYPE_ORDER.map((type) => (
                   <option key={type} value={type}>
                     {EVENT_TYPE_CONFIG[type].label}
@@ -90,7 +95,7 @@ export default function CreateEventModal({
             </Field>
 
             <Field label="Cliente" htmlFor="clientId">
-              <select id="clientId" name="clientId" defaultValue={defaultClientId ?? ""} className={inputClassName}>
+              <select id="clientId" name="clientId" defaultValue={event?.clientId ?? defaultClientId ?? ""} className={inputClassName}>
                 <option value="">Sin cliente</option>
                 {clients.map((client) => (
                   <option key={client.id} value={client.id}>
@@ -101,7 +106,7 @@ export default function CreateEventModal({
             </Field>
 
             <Field label="Proyecto (opcional)" htmlFor="projectId">
-              <select id="projectId" name="projectId" defaultValue={defaultProjectId ?? ""} disabled={!!defaultProjectId} className={inputClassName}>
+              <select id="projectId" name="projectId" defaultValue={event?.projectId ?? defaultProjectId ?? ""} disabled={!!defaultProjectId} className={inputClassName}>
                 <option value="">Sin proyecto</option>
                 {projects.map((project) => (
                   <option key={project.id} value={project.id}>
@@ -112,24 +117,24 @@ export default function CreateEventModal({
             </Field>
 
             <Field label="Fecha" htmlFor="date">
-              <input id="date" name="date" type="date" required defaultValue={defaultDate ?? toDateInputValue(new Date())} className={inputClassName} />
+              <input id="date" name="date" type="date" required defaultValue={event ? toDateInputValue(new Date(event.startAt)) : defaultDate ?? toDateInputValue(new Date())} className={inputClassName} />
             </Field>
 
             <Field label="Hora inicio" htmlFor="startTime">
-              <input id="startTime" name="startTime" type="time" required defaultValue="10:00" className={inputClassName} />
+              <input id="startTime" name="startTime" type="time" required defaultValue={event ? new Date(event.startAt).toTimeString().slice(0, 5) : "10:00"} className={inputClassName} />
             </Field>
 
             <Field label="Hora fin" htmlFor="endTime">
-              <input id="endTime" name="endTime" type="time" required defaultValue="11:00" className={inputClassName} />
+              <input id="endTime" name="endTime" type="time" required defaultValue={event ? new Date(event.endAt).toTimeString().slice(0, 5) : "11:00"} className={inputClassName} />
             </Field>
           </div>
 
           <Field label="Ubicación o enlace" htmlFor="location">
-            <input id="location" name="location" placeholder="Oficina, Google Meet..." className={inputClassName} />
+            <input id="location" name="location" defaultValue={event?.location ?? ""} placeholder="Oficina, Google Meet..." className={inputClassName} />
           </Field>
 
           <Field label="Notas" htmlFor="notes">
-            <textarea id="notes" name="notes" rows={3} placeholder="Detalles del evento..." className={`${inputClassName} resize-none`} />
+            <textarea id="notes" name="notes" rows={3} defaultValue={event?.notes ?? ""} placeholder="Detalles del evento..." className={`${inputClassName} resize-none`} />
           </Field>
         </div>
 
@@ -138,7 +143,7 @@ export default function CreateEventModal({
             Cancelar
           </Button>
           <Button type="submit" variant="primary" disabled={isPending}>
-            {isPending ? "Creando..." : "Crear evento"}
+            {isPending ? "Guardando..." : event ? "Guardar cambios" : "Crear evento"}
           </Button>
         </div>
       </form>

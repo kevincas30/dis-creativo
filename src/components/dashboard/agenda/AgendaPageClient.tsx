@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Plus } from "lucide-react";
+import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { Plus, Trash2 } from "lucide-react";
 import AgendaHeader from "@/components/dashboard/agenda/AgendaHeader";
 import MonthCalendarGrid from "@/components/dashboard/agenda/MonthCalendarGrid";
 import WeekCalendarGrid from "@/components/dashboard/agenda/WeekCalendarGrid";
@@ -10,6 +11,10 @@ import AgendaListView, { type AgendaListDay } from "@/components/dashboard/agend
 import DayEventsPanel from "@/components/dashboard/agenda/DayEventsPanel";
 import AgendaEmptyState from "@/components/dashboard/agenda/AgendaEmptyState";
 import CreateEventModal from "@/components/dashboard/agenda/CreateEventModal";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import AgendaContextMenu, { type AgendaContextTarget } from "@/components/dashboard/agenda/AgendaContextMenu";
+import { deleteAgendaEvent } from "@/app/(dashboard)/agenda/actions";
+import { transitionWorkTask, deleteWorkTask } from "@/app/(dashboard)/trabajo/actions";
 import MobileAgendaView from "@/components/dashboard/agenda/mobile/MobileAgendaView";
 import { useMobileHeaderAction } from "@/components/dashboard/MobileHeaderActionContext";
 import {
@@ -41,7 +46,14 @@ export default function AgendaPageClient({
   const [view, setView] = useState<AgendaView>("month");
   const [referenceDate, setReferenceDate] = useState(() => new Date());
   const [selectedDay, setSelectedDay] = useState(() => new Date());
+  const router = useRouter();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [createOptions, setCreateOptions] = useState<{ date?: string; type?: "MEETING" | "FOLLOW_UP" | "REMINDER" }>({});
+  const [editingEvent, setEditingEvent] = useState<AgendaItemSnapshot | null>(null);
+  const [contextMenu, setContextMenu] = useState<AgendaContextTarget | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<AgendaItemSnapshot | null>(null);
+  const [isActionPending, startTransition] = useTransition();
 
   useMobileHeaderAction(
     <button
@@ -97,9 +109,14 @@ export default function AgendaPageClient({
     setEvents((prev) => [...prev, created]);
   }
 
-  function handleSelectDay(day: Date) {
-    setSelectedDay(day);
-  }
+  function handleSelectDay(day: Date) { setSelectedDay(day); }
+  function openItem(item: AgendaItemSnapshot) { if (item.href) router.push(item.href); else setEditingEvent(item); }
+  function openContext(event: React.MouseEvent | React.KeyboardEvent, item: AgendaItemSnapshot | null, date: Date) { event.preventDefault(); setSelectedDay(date); const element = event.currentTarget as HTMLElement; const bounds = element.getBoundingClientRect(); const mouse = event as React.MouseEvent; setContextMenu({ x: mouse.clientX || bounds.left + 16, y: mouse.clientY || bounds.top + 16, item, date: toDateInputValue(date) }); }
+  function createFromContext(type: "TASK" | "MEETING" | "FOLLOW_UP" | "EVENT", date: string) { setContextMenu(null); if (type === "TASK") { router.push(`/trabajo?new=1&dueDate=${date}`); return; } setCreateOptions({ date, type: type === "EVENT" ? "REMINDER" : type }); setIsCreateOpen(true); }
+  function editFromContext(item: AgendaItemSnapshot) { setContextMenu(null); if (item.taskId) { router.push(`/trabajo?task=${item.taskId}`); return; } if (item.href) { router.push(item.href); return; } setEditingEvent(item); }
+  function changeTaskStatus(item: AgendaItemSnapshot) { if (!item.taskId) return; setContextMenu(null); setActionError(null); const action = item.taskStatus === "COMPLETED" ? "REOPEN" : item.taskNeedsReview ? "SEND_REVIEW" : "COMPLETE"; startTransition(async () => { const result = await transitionWorkTask(item.taskId!, action); if (result.error) setActionError(result.error); else router.refresh(); }); }
+  function deleteFromContext(item: AgendaItemSnapshot) { setContextMenu(null); setDeleteTarget(item); }
+  function confirmDelete() { if (!deleteTarget) return; const item = deleteTarget; setActionError(null); startTransition(async () => { try { if (item.taskId) { const result = await deleteWorkTask(item.taskId); if (result.error) setActionError(result.error); else { setDeleteTarget(null); router.refresh(); } } else if (!item.agendaKind) { await deleteAgendaEvent(item.id); setEvents((current) => current.filter((event) => event.id !== item.id)); setDeleteTarget(null); router.refresh(); } } catch { setActionError("No se pudo eliminar este elemento."); } }); }
 
   function handleViewChange(nextView: AgendaView) {
     if (nextView === "day") {
@@ -152,6 +169,7 @@ export default function AgendaPageClient({
 
   return (
     <div className="flex h-full min-h-0 flex-col lg:block lg:h-auto">
+      {actionError ? <p role="alert" className="mb-4 rounded-xl border border-red-400/30 bg-red-500/5 p-3 text-sm text-red-400">{actionError}</p> : null}
       {/* Desktop/tablet: Mes/Semana/Día/Lista + panel lateral, sin cambios. */}
       <div className="hidden space-y-6 lg:block">
         <AgendaHeader
@@ -173,10 +191,12 @@ export default function AgendaPageClient({
                 eventsByDay={eventsByDay}
                 selectedDay={selectedDay}
                 onSelectDay={handleSelectDay}
+                onContextMenu={openContext}
+                onOpenItem={openItem}
               />
             ) : null}
             {view === "week" ? (
-              <WeekCalendarGrid days={getWeekDays(referenceDate)} eventsByDay={eventsByDay} selectedDay={selectedDay} onSelectDay={handleSelectDay} />
+              <WeekCalendarGrid days={getWeekDays(referenceDate)} eventsByDay={eventsByDay} selectedDay={selectedDay} onSelectDay={handleSelectDay} onContextMenu={openContext} onOpenItem={openItem} />
             ) : null}
             {view === "day" ? <DayView events={referenceDayEvents} /> : null}
             {view === "list" ? <AgendaListView days={listViewDays} onSelectDay={handleSelectDay} /> : null}
@@ -188,7 +208,7 @@ export default function AgendaPageClient({
 
       {/* Móvil: experiencia tipo Calendario de iPhone (scroll continuo de meses + vista Día a pantalla completa). */}
       <div className="h-full min-h-0 lg:hidden">
-        <MobileAgendaView eventsByDay={eventsByDay} />
+        <MobileAgendaView eventsByDay={eventsByDay} onOpenItem={openItem} onMoreItem={(event, item) => openContext(event, item, new Date(item.startAt))} />
       </div>
 
       <CreateEventModal
@@ -196,9 +216,13 @@ export default function AgendaPageClient({
         onClose={() => setIsCreateOpen(false)}
         clients={clients}
         projects={projects}
-        defaultDate={view === "day" ? toDateInputValue(referenceDate) : toDateInputValue(selectedDay)}
-        onCreated={handleCreated}
+        defaultDate={createOptions.date ?? (view === "day" ? toDateInputValue(referenceDate) : toDateInputValue(selectedDay))}
+        defaultType={createOptions.type}
+        onCreated={(created) => { handleCreated(created); setCreateOptions({}); }}
       />
+      <CreateEventModal isOpen={Boolean(editingEvent)} onClose={() => setEditingEvent(null)} clients={clients} projects={projects} event={editingEvent} onCreated={(updated) => { setEvents((current) => current.map((event) => event.id === updated.id ? updated : event)); setEditingEvent(null); }} />
+      <AgendaContextMenu target={contextMenu} onClose={() => setContextMenu(null)} onCreate={createFromContext} onOpen={(item) => { setContextMenu(null); openItem(item); }} onEdit={editFromContext} onTaskStatus={changeTaskStatus} onDelete={deleteFromContext} />
+      <ConfirmDialog isOpen={Boolean(deleteTarget)} title={deleteTarget?.taskId ? "Eliminar tarea" : "Eliminar evento"} description="Esta acción eliminará el elemento y no se puede deshacer." confirmLabel="Eliminar" pendingLabel="Eliminando..." icon={Trash2} isPending={isActionPending} onClose={() => setDeleteTarget(null)} onConfirm={confirmDelete} />
     </div>
   );
 }

@@ -75,6 +75,21 @@ body {
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
+button:not(:disabled),
+a[href],
+select {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+input:not([type="checkbox"]):not([type="radio"]),
+textarea {
+  cursor: text;
+}
+
 /* Chrome aplica un fondo propio a los valores recordados. Dentro del
    formulario comercial se reemplaza por los tokens del tema actual. */
 .client-form input:-webkit-autofill,

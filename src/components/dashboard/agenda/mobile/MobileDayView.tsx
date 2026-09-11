@@ -31,11 +31,15 @@ export default function MobileDayView({
   eventsByDay,
   onClose,
   onChangeDay,
+  onOpenItem,
+  onMoreItem,
 }: {
   date: Date;
   eventsByDay: Map<string, AgendaItemSnapshot[]>;
   onClose: () => void;
   onChangeDay: (date: Date) => void;
+  onOpenItem?: (event: AgendaItemSnapshot) => void;
+  onMoreItem?: (click: React.MouseEvent, event: AgendaItemSnapshot) => void;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -155,7 +159,7 @@ export default function MobileDayView({
             {dayEvents.map((event) => {
               const top = minutesToPx(minutesOf(new Date(event.startAt)));
               const height = Math.max(minutesToPx(minutesOf(new Date(event.endAt))) - top, 28);
-              return <EventTimelineCard key={event.id} event={event} top={top} height={height} />;
+              return <EventTimelineCard key={event.id} event={event} top={top} height={height} onOpen={onOpenItem} onMore={onMoreItem} />;
             })}
           </div>
         </div>
