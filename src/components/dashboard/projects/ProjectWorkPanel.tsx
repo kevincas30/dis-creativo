@@ -64,6 +64,9 @@ export default function ProjectWorkPanel({ view, selectedPeriodId, role }: { vie
   const depositExpected = Number(scope.depositExpected ?? 0);
   const source = view.periods.find((item) => item.id === sourceId);
   const nextStart = source ? nextMonthDate(source.startDate) : today;
+  const periodDueSoon = Boolean(
+    recurring && period?.dueDate && new Date(`${period.dueDate.slice(0, 10)}T23:59:59`).getTime() - new Date(`${today}T00:00:00`).getTime() <= 7 * 24 * 60 * 60 * 1000 && new Date(`${period.dueDate.slice(0, 10)}T23:59:59`).getTime() >= new Date(`${today}T00:00:00`).getTime() && !view.periods.some((item) => item.startDate > period.startDate),
+  );
 
   function submit(form: FormData, root = false) {
     if (!root && periodId) form.set("periodId", periodId);
@@ -98,6 +101,7 @@ export default function ProjectWorkPanel({ view, selectedPeriodId, role }: { vie
         {recurring ? <div className="rounded-xl border border-surface-border bg-foreground/[0.03] p-3"><p className="text-muted-foreground text-xs">Periodo actual</p><Select aria-label="Periodo actual" className={`${input} mt-2 py-1.5`} value={periodId ?? ""} onChange={(event) => { if (event.target.value) router.push(`/projects/${project.id}?period=${event.target.value}`); }}><option value="">Sin periodo</option>{view.periods.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</Select></div> : <div className="rounded-xl border border-surface-border bg-foreground/[0.03] p-3"><p className="text-muted-foreground text-xs">Tipo</p><p className="mt-2 text-sm">Proyecto único</p></div>}
       </div>
       <div className="mt-5 flex flex-wrap gap-2"><Button type="button" onClick={() => setTaskFormOpen(true)} disabled={!hasScope}><Plus className="h-4 w-4" /> Tarea</Button><Button type="button" variant="secondary" onClick={() => { setRequestId(crypto.randomUUID()); setPaymentOpen(true); }} disabled={!hasScope || !scope.currency}>Registrar pago</Button><Button type="button" variant="secondary" onClick={() => setEventOpen(true)} disabled={!hasScope}><CalendarDays className="h-4 w-4" /> Reunión</Button></div>
+      {periodDueSoon ? <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-400/25 bg-amber-400/10 px-3 py-2 text-sm"><span>El periodo actual termina pronto. Revisa el siguiente antes de crearlo.</span><Button type="button" variant="ghost" className="px-2" onClick={() => { setPeriodManagerOpen(true); document.getElementById("project-settings")?.scrollIntoView({ behavior: "smooth" }); }}>Preparar siguiente periodo</Button></div> : null}
     </section>
 
     {hasScope ? <Section title="Tareas y entregables" action={<Button type="button" variant="ghost" className="px-2" onClick={() => setTaskFormOpen((open) => !open)}><Plus className="h-4 w-4" /> Añadir</Button>}>
